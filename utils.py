@@ -62,6 +62,9 @@ def is_prob_prime(n, prob_fail=1e-80):
 	if n < 2:
 		raise ValueError("Cannot perform primality test on integers less than 2")
 
+	if n==2 or n==3 or n==5 or n==7 or n==11:
+		return True
+
 	if n%2==0 or n%3==0 or n%5==0 or n%7==0 or n%11==0:
 		return False
 

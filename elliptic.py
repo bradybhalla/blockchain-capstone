@@ -66,3 +66,17 @@ class EllipticCurveFF:
 			raise ValueError("This method only works on an elliptic curve with p%4==3")
 
 		return Point(x%self.p, pow(a, (self.p+1)>>2, self.p))
+
+	# least significant bit is parity
+	# other bits are x-value
+	# make sure p%4==3 or uncompressing won't work
+	def compress(self, point):
+		parity = point.y%2
+		return (point.x<<1) + parity
+
+	def uncompress(self, compressed_value):
+		parity = compressed_value & 1
+		point = self.find_point(compressed_value >> 1)
+		if not point.y%2 == parity:
+			point.y = -point.y%self.p
+		return point

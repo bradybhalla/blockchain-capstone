@@ -1,4 +1,5 @@
 from utils import *
+from elliptic import *
 from abc import ABCMeta, abstractmethod
 
 class DigitalSignature(metaclass=ABCMeta):
@@ -69,13 +70,21 @@ class DSA(DigitalSignature):
 		V2 = S1*S2_inv%self.q
 		return pow(self.g, V1, self.p)*pow(pub, V2, self.p)%self.p%self.q == S1
 
+# uses secp256k1 curve (bitcoin curve)
 class ECDSA(DigitalSignature):
-	# TODO
 	def __init__(self):
-		pass
+		# define curve
+		self.curve = EllipticCurveFF(2**256 - 2**32 - 977, 0, 7)
+
+		# get generator point
+		self.G = self.curve.uncompress(0xF37CCCFDF3B97758AB40C52B9D0E160E0537F9B65B9C51B2B3E502B62DF02F30)
+
+		# (prime) order of generator point
+		self.n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 
 	def keygen(self):
-		pass
+		priv = randint(0,self.n-1)
+		pub = self.curve.mult(self.G, priv)
 
 	def sign(self, H, priv):
 		pass
