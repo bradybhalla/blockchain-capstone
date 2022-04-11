@@ -21,6 +21,9 @@ class EllipticCurveFF:
 		self.A = A
 		self.B = B
 
+	def equals(self, p1, p2):
+		return p1.x==p2.x and p1.y==p2.y
+
 	def contains_point(self, point):
 		if point is O:
 			return True

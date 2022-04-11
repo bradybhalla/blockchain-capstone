@@ -85,9 +85,16 @@ class ECDSA(DigitalSignature):
 	def keygen(self):
 		priv = randint(0,self.n-1)
 		pub = self.curve.mult(self.G, priv)
+		return (pub, priv)
 
 	def sign(self, H, priv):
-		pass
+		S1 = self.curve.mult(self.G, priv).x
+		S2 = mod_inv(priv, self.n)*(H + S1*priv)%self.n
+		return (S1, S2)
 
 	def verify(self, H, sig, pub):
-		pass
+		S1, S2 = sig
+		S2_inv = mod_inv(S2, self.n)
+		V = self.curve.mult(self.G, H*S2_inv%self.n)
+		V = self.curve.add(V, self.curve.mult(pub, S1*S2_inv%self.n))
+		return self.curve.equals(V, pub)
