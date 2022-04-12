@@ -1,3 +1,4 @@
+from abc import ABCMeta, abstractmethod
 from signature import *
 
 def pub_to_addr(key):
@@ -25,15 +26,18 @@ class Transaction:
 		self.pub_key = pub_key
 		self.sig = sig
 
-
-class Ledger:
+class AbstractLedger(metaclass=ABCMeta):
 	def __init__(self):
-		self._sig_algorithm = ECDSA()
+		self._sig_algorithm = self.create_sig_algorithm()
 		self._past_ids = set()
 		self._money = {}
 
 		self._sudo = self.create_account()
 		self._money[self._sudo[0]] = 0
+
+	@abstractmethod
+	def create_sig_algorithm(self):
+		pass
 
 	def is_valid(self, t):
 		# money must be available
@@ -77,6 +81,11 @@ class Ledger:
 		H = hash_int(t)
 		t.approve(self._sig_algorithm.sign(H, priv), pub)
 		return t
+
+# ledger using ECDSA
+class Ledger(AbstractLedger):
+	def create_sig_algorithm(self):
+		return ECDSA()
 
 
 if __name__ == "__main__":
