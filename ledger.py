@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 from signature import *
 
 def pub_to_addr(key):
-	return hash_base64(key)[:20]
+	return hash_base64(key)[:24]
 
 class Transaction:
 	def __init__(self, from_addr, to_addr, amount, unique_id):
@@ -47,7 +47,7 @@ class AbstractLedger(metaclass=ABCMeta):
 			return False
 
 		# unique id must not be in past_ids
-		if t.unique_id in self._past_ids:
+		if hash_base64(t) in self._past_ids:
 			return False
 
 		# public key must match from_addr
@@ -59,7 +59,7 @@ class AbstractLedger(metaclass=ABCMeta):
 
 	def add_transaction(self, t):
 		if self.is_valid(t):
-			self._past_ids.add(t.unique_id)
+			self._past_ids.add(hash_base64(t))
 
 			self._money[t.from_addr] -= t.amount
 			if t.to_addr not in self._money:
@@ -75,9 +75,10 @@ class AbstractLedger(metaclass=ABCMeta):
 		addr = pub_to_addr(pub)
 		return (addr, pub, priv)
 
-	def create_signed_transaction(self, account, to_addr, amount):
+	# for repeat transactions, change unique_id
+	def create_signed_transaction(self, account, to_addr, amount, unique_id=1):
 		addr, pub, priv = account
-		t = Transaction(addr, to_addr, amount, randint(1, 2**256))
+		t = Transaction(addr, to_addr, amount, unique_id)
 		H = hash_int(t)
 		t.approve(self._sig_algorithm.sign(H, priv), pub)
 		return t
@@ -91,11 +92,11 @@ class Ledger(AbstractLedger):
 if __name__ == "__main__":
 	L = Ledger()
 	brady = L.create_account()
-	t = L.create_signed_transaction(L._sudo, brady[0], 1)
-	t2 = L.create_signed_transaction(brady, "bobby", 2)
-
-	print(L.add_transaction(t))
-	print(L.add_transaction(t2))
+	finn = L.create_account()
+	t = L.create_signed_transaction(L._sudo, brady[0], 100)
+	t2 = L.create_signed_transaction(L._sudo, finn[0], 200)
+	t3 = L.create_signed_transaction(finn, brady[0], 150)
+	L.add_transaction(t)
+	L.add_transaction(t2)
+	L.add_transaction(t3)
 	print(L._money)
-
-
