@@ -83,14 +83,13 @@ class AbstractLedger(metaclass=ABCMeta):
 		t.approve(self._sig_algorithm.sign(H, priv), pub)
 		return t
 
-# ledger using ECDSA
-class Ledger(AbstractLedger):
+class CompressedECDSALedger(AbstractLedger):
 	def create_sig_algorithm(self):
-		return ECDSA()
+			return CompressedECDSA()
 
 
 if __name__ == "__main__":
-	L = Ledger()
+	L = CompressedECDSALedger()
 	brady = L.create_account()
 	finn = L.create_account()
 	t = L.create_signed_transaction(L._sudo, brady[0], 100)

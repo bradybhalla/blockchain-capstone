@@ -71,7 +71,6 @@ class DSA(DigitalSignature):
 		return pow(self.g, V1, self.p)*pow(pub, V2, self.p)%self.p%self.q == S1
 
 # uses secp256k1 curve (bitcoin curve)
-# public key is compressed
 class ECDSA(DigitalSignature):
 	def __init__(self):
 		# define curve
@@ -85,7 +84,7 @@ class ECDSA(DigitalSignature):
 
 	def keygen(self):
 		priv = randint(0,self.n-1)
-		pub = self.curve.compress(self.curve.mult(self.G, priv))
+		pub = self.curve.mult(self.G, priv)
 		return (pub, priv)
 
 	def sign(self, H, priv):
@@ -98,5 +97,34 @@ class ECDSA(DigitalSignature):
 		S1, S2 = sig
 		S2_inv = mod_inv(S2, self.n)
 		V = self.curve.mult(self.G, H*S2_inv%self.n)
-		V = self.curve.add(V, self.curve.mult(self.curve.uncompress(pub), S1*S2_inv%self.n))
+		V = self.curve.add(V, self.curve.mult(pub, S1*S2_inv%self.n))
 		return V.x%self.n == S1
+
+# compressed version of ECDSA
+# use base64 strings instead of numbers
+class CompressedECDSA(ECDSA):
+	# S1 and S2 take no more than 256 bits
+	def _compress_sig(self, S1, S2):
+		sig = (S1<<256) + S2
+		return int_to_base64(sig, 2*256//8)
+	def _uncompress_sig(self, sig):
+		sig = base64_to_int(sig)
+		S2 = sig%(1<<256)
+		S1 = sig>>256
+		return (S1, S2)
+
+	def keygen(self):
+		pub, priv = super().keygen()
+		pub = int_to_base64(self.curve.compress(pub), 256//8 + 1)
+		priv = int_to_base64(priv, 256//8)
+		return (pub, priv)
+
+	def sign(self, H, priv):
+		priv = base64_to_int(priv)
+		S1, S2 = super().sign(H, priv)
+		return self._compress_sig(S1, S2)
+
+	def verify(self, H, sig, pub):
+		pub = self.curve.uncompress(base64_to_int(pub))
+		sig = self._uncompress_sig(sig)
+		return super().verify(H, sig, pub)
