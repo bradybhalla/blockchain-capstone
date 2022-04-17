@@ -1,5 +1,5 @@
 from utils import *
-from elliptic import *
+from elliptic import EllipticCurveFF
 from abc import ABCMeta, abstractmethod
 
 class DigitalSignature(metaclass=ABCMeta):

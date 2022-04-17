@@ -85,7 +85,7 @@ def gen_prime(bits):
 
 
 """
-Hashing and converting
+Hashing and converting encoding
 """
 
 def get_hash(s):
@@ -106,3 +106,16 @@ def int_to_base64(num, num_bytes):
 
 def base64_to_int(b64):
 	return int(b64decode(b64).hex(), 16)
+
+
+"""
+Blockchain
+"""
+def pub_to_addr(key):
+	return hash_base64(key)[:24]
+
+def calc_miner_reward(height):
+	return 100
+
+def proof_of_work_verify(H, security=2):
+	return H[:security] == "B"*security
