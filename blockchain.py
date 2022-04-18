@@ -19,6 +19,7 @@ class Block:
 
 # block parsed for use in the blockchain graph
 # stores only necessary information instead of full data of each transaction
+# also tracks previous and next nodes
 class BlockchainNode:
 	# verify block before creating BlockchainNode
 	def __init__(self, block, prev_node):
@@ -57,7 +58,7 @@ class Block0(BlockchainNode):
 		raise NotImplementedError("Can't create action for the first node")
 
 # actions that act on LedgerState
-# undo or redo blocks when branching the blockchain
+# undo or redo blocks when navigating the blockchain
 class LedgerStateAction:
 	def __init__(self, node, undo):
 		self.node = node
@@ -104,13 +105,13 @@ class BlockchainManager:
 		# find prev_block, update LedgerState
 		to_check = []
 		paths = {}
+		# breadth first search OR search max height first, use a queue
 
 
 		# verify transactions
 		# add new block
 		# add block hash to past blocks
 		# un-update LedgerState if max_height >= new blocks height
-		pass
 	def create_block(info):
 		pass
 
