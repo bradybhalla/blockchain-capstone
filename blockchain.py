@@ -31,7 +31,7 @@ class BlockchainNode:
 		self.net_ledger = {}
 		self.transaction_hashes = set()
 
-		self.net_ledger[block.miner] = calc_miner_reward(self.height)
+		# todo: undo later ///// self.net_ledger[block.miner] = calc_miner_reward(self.height)
 		for t in block.transactions:
 			if t.from_addr not in self.net_ledger:
 				self.net_ledger[t.from_addr] = 0
@@ -53,6 +53,7 @@ class Block0(BlockchainNode):
 	def __init__(self):
 		self.height = 0
 		self.hash = "0"
+		self.next_nodes = []
 
 	def create_action(self, undo=True):
 		raise NotImplementedError("Can't create action for the first node")
@@ -62,7 +63,7 @@ class Block0(BlockchainNode):
 class LedgerStateAction:
 	def __init__(self, node, undo):
 		self.node = node
-		self.undo = False
+		self.undo = undo
 	def execute(self, ledger, reverse=False):
 		undo = self.undo if not reverse else not self.undo
 		if not undo:
@@ -82,6 +83,7 @@ class LedgerState(Ledger):
 	def __init__(self, current_node):
 		super().__init__()
 		self.current_node = current_node
+		self.max_height = current_node.height
 
 	def update(self, actions, reverse=False):
 		if reverse:
@@ -92,38 +94,125 @@ class LedgerState(Ledger):
 
 class BlockchainManager:
 	def __init__(self):
-		self.past_blocks = set()
-		self.ledger = LedgerState(Block0())
+		self.starting_block = Block0()
+		self.past_blocks = set(self.starting_block.hash) # hashes of past blocks
+		self.ledger = LedgerState(self.starting_block)
+
+	def _find_node(self, target_hash, current_path=None, visited=None):
+		current_node = self.ledger.current_node
+
+		current_path = []
+		visited = set([self.ledger.current_node.hash])
+
+		if current_node.hash == target_hash:
+			return current_node, current_path
+
+		while current_node.hash != self.starting_block.hash:
+			visited.add(current_node.prev_node.hash)
+			current_path.append(LedgerStateAction(current_node, True))
+			current_node = current_node.prev_node
+
+			if len(set([n.hash for n in current_node.next_nodes]) - visited) > 0:
+				res = self._search_forward(current_node, target_hash, current_path, visited)
+				if res is not None:
+					return res
+
+			if current_node.hash == target_hash:
+				return current_node, current_path
+
+			# todo: remove print statements
+
+		raise Exception("Could not find node")
+
+	def _search_forward(self, current_node, target_hash, current_path, visited):
+		while True:
+			if current_node.hash == target_hash:
+				return current_node, current_path
+
+			if len(set([n.hash for n in current_node.next_nodes]) - visited) == 0:
+				return None
+
+			next_node = None
+			for n in current_node.next_nodes:
+				if n.hash not in visited:
+					visited.add(n.hash)
+					if next_node is None:
+						next_node = n
+					else:
+						res = self._search_forward(n, target_hash, current_path + [LedgerStateAction(n, False)], visited)
+						if res is not None:
+							return res
+
+			current_path.append(LedgerStateAction(next_node, False))
+			current_node = next_node
+
+
+	def _verify_block(self, block):
+		# assumes ledger state is set up correctly
+		pass
 
 	def add_block(self, block):
-		if not proof_of_work_verify(block.hash):
-			raise Exception("Proof of work failed")
+		#if not proof_of_work_verify(block.hash):
+		#	raise Exception("Proof of work failed")
 
 		if block.hash in self.past_blocks:
 			raise Exception("Block already exists")
 
-		# find prev_block, update LedgerState
-		to_check = []
-		paths = {}
-		# breadth first search OR search max height first, use a queue
+		if block.prev_block_hash not in self.past_blocks:
+			raise Exception("Previous block does not exist")
 
+		print("finding node", block.prev_block_hash)
+		prev_node, actions = self._find_node(block.prev_block_hash)
 
-		# verify transactions
-		# add new block
-		# add block hash to past blocks
-		# un-update LedgerState if max_height >= new blocks height
+		print("updating ledger: ", actions)
+		self.ledger.update(actions)
+
+		# TODO verify transactions
+		
+		print("creating node")
+		new_node = BlockchainNode(block, prev_node)
+
+		print("updating next nodes on", prev_node.hash)
+		prev_node.next_nodes.append(new_node)
+
+		print("adding new block to hashes of past blocks")
+		self.past_blocks.add(new_node.hash)
+
+		print("checking if the max height is larger than the new height")
+		if self.ledger.max_height > new_node.height:
+			print("it is, reverse actions")
+			self.ledger.update(actions, reverse=True)
+		else:
+			print("it isn't, set new max height to", new_node.height)
+			self.ledger.max_height = new_node.height
+			self.ledger.current_node = new_node
+
 	def create_block(info):
 		pass
 
+class Blocks:
+	def __init__(self, H, P):
+		self.transactions = []
+		self.miner = ""
+		self.prev_block_hash = P
+		self.nonce = 0
+
+		self.hash = H
+
 if __name__ == "__main__":
-	L = LedgerState(Block0())
+	blockchain = BlockchainManager()
 
-	t = Transaction("brady", "billy", 10, 10, 1)
-	t2 = Transaction("billy", "brady", 10, 2, 1)
-	B = Block([t, t2], "jeff", L.current_node.hash, "50")
-	node = BlockchainNode(B, L.current_node)
+	blockchain.add_block(Blocks(1,"0"))
+	blockchain.add_block(Blocks(2,"0"))
+	blockchain.add_block(Blocks(3,2))
+	blockchain.add_block(Blocks(4,3))
+	blockchain.add_block(Blocks(5,4))
+	blockchain.add_block(Blocks(6,"0"))
+	blockchain.add_block(Blocks(7,1))
+	blockchain.add_block(Blocks(8,4))
+	blockchain.add_block(Blocks(9,3))
+	blockchain.add_block(Blocks(10,9))
+	blockchain.add_block(Blocks(11,10))
+	blockchain.add_block(Blocks(12,9))
+	blockchain.add_block(Blocks(13,4))
 
-	t3 = Transaction("brady", "billy", 10, 10, 1)
-	t4 = Transaction("billy", "brady", 10, 2, 1)
-	B2 = Block([t3, t4], "jeff", node.hash, "50")
-	node2 = BlockchainNode(B2, node)
