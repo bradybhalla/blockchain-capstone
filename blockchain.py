@@ -31,7 +31,7 @@ class BlockchainNode:
 		self.net_ledger = {}
 		self.transaction_hashes = set()
 
-		# todo: undo later ///// self.net_ledger[block.miner] = calc_miner_reward(self.height)
+		self.net_ledger[block.miner] = calc_miner_reward(self.height)
 		for t in block.transactions:
 			if t.from_addr not in self.net_ledger:
 				self.net_ledger[t.from_addr] = 0
@@ -113,14 +113,12 @@ class BlockchainManager:
 			current_node = current_node.prev_node
 
 			if len(set([n.hash for n in current_node.next_nodes]) - visited) > 0:
-				res = self._search_forward(current_node, target_hash, current_path, visited)
+				res = self._search_forward(current_node, target_hash, current_path[:], visited)
 				if res is not None:
 					return res
 
 			if current_node.hash == target_hash:
 				return current_node, current_path
-
-			# todo: remove print statements
 
 		raise Exception("Could not find node")
 
@@ -161,39 +159,31 @@ class BlockchainManager:
 		if block.prev_block_hash not in self.past_blocks:
 			raise Exception("Previous block does not exist")
 
-		print("finding node", block.prev_block_hash)
 		prev_node, actions = self._find_node(block.prev_block_hash)
 
-		print("updating ledger: ", actions)
 		self.ledger.update(actions)
 
 		# TODO verify transactions
 		
-		print("creating node")
 		new_node = BlockchainNode(block, prev_node)
 
-		print("updating next nodes on", prev_node.hash)
 		prev_node.next_nodes.append(new_node)
 
-		print("adding new block to hashes of past blocks")
 		self.past_blocks.add(new_node.hash)
 
-		print("checking if the max height is larger than the new height")
 		if self.ledger.max_height > new_node.height:
-			print("it is, reverse actions")
 			self.ledger.update(actions, reverse=True)
 		else:
-			print("it isn't, set new max height to", new_node.height)
 			self.ledger.max_height = new_node.height
-			self.ledger.current_node = new_node
+			self.ledger.update([LedgerStateAction(new_node, False)])
 
 	def create_block(info):
 		pass
 
 class Blocks:
 	def __init__(self, H, P):
-		self.transactions = []
-		self.miner = ""
+		self.transactions = [Transaction(1, randint(1,5), randint(5,10), randint(1,3), randint(1,1000)) for i in range(5)]
+		self.miner = randint(1,5)
 		self.prev_block_hash = P
 		self.nonce = 0
 
@@ -201,6 +191,7 @@ class Blocks:
 
 if __name__ == "__main__":
 	blockchain = BlockchainManager()
+	blockchain.ledger.money[1] = 1000
 
 	blockchain.add_block(Blocks(1,"0"))
 	blockchain.add_block(Blocks(2,"0"))
