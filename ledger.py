@@ -23,6 +23,16 @@ class Transaction:
 		self.pub_key = pub_key
 		self.sig = sig
 
+	def convert_to_str(self):
+		vals = [self.from_addr, self.to_addr, self.amount, self.miner_fee, self.unique_id, self.sig, self.pub_key]
+		return " // ".join([str(i) for i in vals])
+
+	def convert_from_str(s):
+		from_addr, to_addr, amount, miner_fee, unique_id, sig, pub_key = " // ".split(s)
+		res = Transaction(from_addr, to_addr, int(amount), int(miner_fee), unique_id)
+		res.approve(sig, pub_key)
+		return res
+
 class Ledger:
 	def __init__(self):
 		self.sig_algorithm = CompressedECDSA()

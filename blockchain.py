@@ -13,9 +13,23 @@ class Block:
 
 	def calc_hash(self):
 		# TODO: maybe implement merkle root later
-		transactions_hash = hash_base64(" ".join(t.hash for i in self.transactions))
+		transactions_hash = hash_base64(" ".join(t.hash for t in self.transactions))
 		data_hash = hash_base64(self.prev_block_hash + transactions_hash + self.miner)
-		return hash_base64(data_hash + str(self.nonce))
+		return hash_base64(data_hash + self.nonce)
+
+	def convert_to_str(self):
+		res = ""
+		res += self.prev_block_hash + "\n"
+		res += self.miner + "\n"
+		res += self.nonce + "\n"
+		res += "\n".join([t.convert_to_str() for t in self.transactions])
+		return res[:-1] if len(self.transactions)==0 else res
+
+	def convert_from_str(s):
+		prev_block_hash, miner, nonce, *transactions = s.split("\n")
+		transactions = [Transaction.convert_from_str(t) for t in transactions]
+		return Block(transactions, miner, prev_block_hash, nonce)
+		
 
 # block parsed for use in the blockchain graph
 # stores only necessary information instead of full data of each transaction
@@ -99,6 +113,7 @@ class BlockchainManager:
 		self.ledger = LedgerState(self.starting_block)
 
 	def _find_node(self, target_hash, current_path=None, visited=None):
+		# assumes the ledger's current node doesn't have any next nodes
 		current_node = self.ledger.current_node
 
 		current_path = []
@@ -123,6 +138,7 @@ class BlockchainManager:
 		raise Exception("Could not find node")
 
 	def _search_forward(self, current_node, target_hash, current_path, visited):
+		# only for use in _find_node
 		while True:
 			if current_node.hash == target_hash:
 				return current_node, current_path
@@ -145,13 +161,18 @@ class BlockchainManager:
 			current_node = next_node
 
 
-	def _verify_block(self, block):
+	def _verify_block_transactions(self, block):
 		# assumes ledger state is set up correctly
-		pass
+		for t in block.transactions:
+			if not self.ledger.is_valid(t):
+				return False
+		return True
 
 	def add_block(self, block):
-		#if not proof_of_work_verify(block.hash):
-		#	raise Exception("Proof of work failed")
+		# TODO add max block length??
+
+		if not proof_of_work_verify(block.hash):
+			raise Exception("Proof of work failed")
 
 		if block.hash in self.past_blocks:
 			raise Exception("Block already exists")
@@ -160,13 +181,12 @@ class BlockchainManager:
 			raise Exception("Previous block does not exist")
 
 		prev_node, actions = self._find_node(block.prev_block_hash)
-
 		self.ledger.update(actions)
 
-		# TODO verify transactions
+		if not self._verify_block_transactions(block):
+			raise Exception("Invalid transactions in block")
 		
 		new_node = BlockchainNode(block, prev_node)
-
 		prev_node.next_nodes.append(new_node)
 
 		self.past_blocks.add(new_node.hash)
@@ -177,33 +197,5 @@ class BlockchainManager:
 			self.ledger.max_height = new_node.height
 			self.ledger.update([LedgerStateAction(new_node, False)])
 
-	def create_block(info):
-		pass
-
-class Blocks:
-	def __init__(self, H, P):
-		self.transactions = [Transaction(1, randint(1,5), randint(5,10), randint(1,3), randint(1,1000)) for i in range(5)]
-		self.miner = randint(1,5)
-		self.prev_block_hash = P
-		self.nonce = 0
-
-		self.hash = H
-
-if __name__ == "__main__":
-	blockchain = BlockchainManager()
-	blockchain.ledger.money[1] = 1000
-
-	blockchain.add_block(Blocks(1,"0"))
-	blockchain.add_block(Blocks(2,"0"))
-	blockchain.add_block(Blocks(3,2))
-	blockchain.add_block(Blocks(4,3))
-	blockchain.add_block(Blocks(5,4))
-	blockchain.add_block(Blocks(6,"0"))
-	blockchain.add_block(Blocks(7,1))
-	blockchain.add_block(Blocks(8,4))
-	blockchain.add_block(Blocks(9,3))
-	blockchain.add_block(Blocks(10,9))
-	blockchain.add_block(Blocks(11,10))
-	blockchain.add_block(Blocks(12,9))
-	blockchain.add_block(Blocks(13,4))
-
+	def get_prev_block_hash(self):
+		return self.ledger.current_node.hash

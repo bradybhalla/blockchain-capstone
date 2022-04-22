@@ -117,5 +117,5 @@ def pub_to_addr(key):
 def calc_miner_reward(height):
 	return 100
 
-def proof_of_work_verify(H, security=2):
+def proof_of_work_verify(H, security=3):
 	return H[:security] == "B"*security
