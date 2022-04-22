@@ -1,7 +1,10 @@
+# classes for client use: creating accounts, mining blocks, running nodes
+# TODO this will be broken into other files later
+
 from utils import *
 from signature import CompressedECDSA
-from ledger import Transaction
-from blockchain import Block
+from transaction import Transaction
+from blockchain import Block, BlockchainManager
 
 class Wallet:
 	def __init__(self):
@@ -23,6 +26,7 @@ class Wallet:
 	def get_addr(self, name):
 		return self.accounts[name][0]
 
+# doesn't do any verification
 class SimpleMiner:
 	def __init__(self, addr):
 		self.addr = addr
@@ -46,3 +50,12 @@ class SimpleMiner:
 	def _block_data_hash(self, transactions, miner, prev_block_hash):
 		transactions_hash = hash_base64(" ".join(t.hash for t in transactions))
 		return hash_base64(prev_block_hash + transactions_hash + miner)
+
+class Node:
+	def __init__(self):
+		self.blockchain = BlockchainManager()
+		self.source_nodes = set()
+	def add_source(addr):
+		self.source_nodes.add(addr)
+	def remove_source(addr):
+		self.source_nodes.remove(addr)

@@ -1,5 +1,9 @@
+# blocks and blockchain
+# also includes classes for simplifying blocks into "blockchain nodes"
+# these can be turned into actions which allows the graph structure of the blockchain to work efficiently
+
 from utils import *
-from ledger import Transaction, Ledger
+from transaction import Transaction, Ledger
 
 # block of transactions
 class Block:

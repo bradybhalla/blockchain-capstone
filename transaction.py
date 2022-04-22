@@ -1,3 +1,6 @@
+# transaction and ledger classes
+# basic units of blockchain
+
 from utils import *
 from signature import CompressedECDSA
 

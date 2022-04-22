@@ -1,3 +1,5 @@
+# basic tools needed for the project
+
 from random import randint
 from hashlib import sha256
 from base64 import b64encode, b64decode

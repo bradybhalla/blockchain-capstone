@@ -1,3 +1,5 @@
+# math of elliptic curves (needed for ECDSA)
+
 from utils import *
 
 # pretend this is immutable
