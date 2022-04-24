@@ -195,7 +195,8 @@ class BlockchainManager:
 
 		self.past_blocks.add(new_node.hash)
 
-		if self.ledger.max_height > new_node.height:
+		# only reverse if the new block is strictly higher than the old block
+		if self.ledger.max_height >= new_node.height:
 			self.ledger.update(actions, reverse=True)
 		else:
 			self.ledger.max_height = new_node.height

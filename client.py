@@ -7,6 +7,7 @@ from transaction import Transaction
 from blockchain import Block, BlockchainManager
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlparse, parse_qs
 from threading import Thread
 
 class Wallet:
@@ -56,39 +57,58 @@ class SimpleMiner:
 
 class Node(BlockchainManager):
 	def __init__(self):
-		self.blocks = {"/brad":""}
-		self.source_nodes = set()
+		super().__init__()
+		self.blocks = {}
+		self.sources = set(["source1", "source2"])
 
 		self.webserver = HTTPServer(("localhost", 8000), self._create_handler_class())
 		self.server_thread = Thread(target=self.webserver.serve_forever)
 
 	def _create_handler_class(node_obj):
 		class NodeRequestHandler(BaseHTTPRequestHandler):
+			def log_message(self, format, *args):
+				return
+
 			def do_GET(self):
 				self.send_response(200)
 				self.send_header("Content-type", "text/html")
 				self.end_headers()
 
-				try:
-					self.wfile.write(bytes(node_obj.blocks[self.path].convert_to_str(), "utf-8"))
-				except:
-					self.wfile.write(bytes("BLOCK NOT FOUND", "utf-8"))
-			def log_message(self, format, *args):
-				return
+				parsed_url = urlparse(self.path)
+				path = parsed_url.path.strip("/").split("/")
+				query = parse_qs(parsed_url.query)
+				query = {i:j[0] for i,j in query.items()}
+
+				node_obj.handle_get(path, query, self.wfile)
+
+			def do_POST(self):
+				pass
+
 		return NodeRequestHandler
+
+	def handle_get(self, path, query, wfile):
+		# block requests
+		if path == ["block", "latest"]:
+			try:
+				wfile.write(bytes(self.blocks[self.ledger.current_node.hash], "utf-8"))
+			except KeyError:
+				wfile.write(bytes("NO BLOCKS RECORDED", "utf-8"))
+		elif path == ["block"]:
+			try:
+				wfile.write(bytes(self.blocks[query["H"]], "utf-8"))
+			except KeyError:
+				wfile.write(bytes("BLOCK NOT FOUND", "utf-8"))
+
+		# source requests
+		if path == ["source", "list"]:
+			wfile.write(bytes("\n".join(self.sources), "utf-8"))
+
+		# ping request
+		if path == ["ping"]:
+			wfile.write(bytes("RUNNING", "utf-8"))
 
 	def start_server(self):
 		self.server_thread.start()
 	def stop_server(self):
 		self.webserver.shutdown()
 		self.server_thread.join()
-
-	def ping_sources(self):
-		pass
-	def request_sources(self):
-		pass
-
-	def request_newest_block(self):
-		pass
-	def request_block(self, hash):
-		pass
