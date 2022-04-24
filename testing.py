@@ -3,8 +3,12 @@
 from client import Wallet, SimpleMiner, Node
 from blockchain import BlockchainManager
 
+n = Node()
+
+"""
 # initialize blockchain
 blockchain = BlockchainManager()
+
 
 # create accounts for brady and finn
 wallet = Wallet()
@@ -14,7 +18,7 @@ wallet.create_account("finn")
 # make a miner for brady
 miner = SimpleMiner(wallet.get_addr("brady"))
 
-"""
+
 # mine a block to get money
 blockchain.add_block(miner.mine_block(blockchain.get_prev_block_hash()))
 

@@ -6,6 +6,9 @@ from signature import CompressedECDSA
 from transaction import Transaction
 from blockchain import Block, BlockchainManager
 
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
+
 class Wallet:
 	def __init__(self):
 		self.sig_algorithm = CompressedECDSA()
@@ -51,11 +54,41 @@ class SimpleMiner:
 		transactions_hash = hash_base64(" ".join(t.hash for t in transactions))
 		return hash_base64(prev_block_hash + transactions_hash + miner)
 
-class Node:
+class Node(BlockchainManager):
 	def __init__(self):
-		self.blockchain = BlockchainManager()
+		self.blocks = {"/brad":""}
 		self.source_nodes = set()
-	def add_source(addr):
-		self.source_nodes.add(addr)
-	def remove_source(addr):
-		self.source_nodes.remove(addr)
+
+		self.webserver = HTTPServer(("localhost", 8000), self._create_handler_class())
+		self.server_thread = Thread(target=self.webserver.serve_forever)
+
+	def _create_handler_class(node_obj):
+		class NodeRequestHandler(BaseHTTPRequestHandler):
+			def do_GET(self):
+				self.send_response(200)
+				self.send_header("Content-type", "text/html")
+				self.end_headers()
+
+				try:
+					self.wfile.write(bytes(node_obj.blocks[self.path].convert_to_str(), "utf-8"))
+				except:
+					self.wfile.write(bytes("BLOCK NOT FOUND", "utf-8"))
+			def log_message(self, format, *args):
+				return
+		return NodeRequestHandler
+
+	def start_server(self):
+		self.server_thread.start()
+	def stop_server(self):
+		self.webserver.shutdown()
+		self.server_thread.join()
+
+	def ping_sources(self):
+		pass
+	def request_sources(self):
+		pass
+
+	def request_newest_block(self):
+		pass
+	def request_block(self, hash):
+		pass
