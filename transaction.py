@@ -31,7 +31,7 @@ class Transaction:
 		return " // ".join([str(i) for i in vals])
 
 	def convert_from_str(s):
-		from_addr, to_addr, amount, miner_fee, unique_id, sig, pub_key = " // ".split(s)
+		from_addr, to_addr, amount, miner_fee, unique_id, sig, pub_key = s.split(" // ")
 		res = Transaction(from_addr, to_addr, int(amount), int(miner_fee), unique_id)
 		res.approve(sig, pub_key)
 		return res

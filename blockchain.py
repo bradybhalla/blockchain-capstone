@@ -22,12 +22,8 @@ class Block:
 		return hash_base64(data_hash + self.nonce)
 
 	def convert_to_str(self):
-		res = ""
-		res += self.prev_block_hash + "\n"
-		res += self.miner + "\n"
-		res += self.nonce + "\n"
-		res += "\n".join([t.convert_to_str() for t in self.transactions])
-		return res[:-1] if len(self.transactions)==0 else res
+		res = "\n".join([self.prev_block_hash, self.miner, self.nonce] + [t.convert_to_str() for t in self.transactions])
+		return res
 
 	def convert_from_str(s):
 		prev_block_hash, miner, nonce, *transactions = s.split("\n")
@@ -110,6 +106,9 @@ class LedgerState(Ledger):
 		for a in actions:
 			a.execute(self, reverse)
 
+class AddBlockException(Exception):
+	pass
+
 class BlockchainManager:
 	def __init__(self):
 		self.starting_block = Block0()
@@ -176,19 +175,19 @@ class BlockchainManager:
 		# TODO add max block length??
 
 		if not proof_of_work_verify(block.hash):
-			raise Exception("Proof of work failed")
+			raise AddBlockException("Proof of work failed")
 
 		if block.hash in self.past_blocks:
-			raise Exception("Block already exists")
+			raise AddBlockException("Block already exists")
 
 		if block.prev_block_hash not in self.past_blocks:
-			raise Exception("Previous block does not exist")
+			raise AddBlockException("Previous block does not exist")
 
 		prev_node, actions = self._find_node(block.prev_block_hash)
 		self.ledger.update(actions)
 
 		if not self._verify_block_transactions(block):
-			raise Exception("Invalid transactions in block")
+			raise AddBlockException("Invalid transactions in block")
 		
 		new_node = BlockchainNode(block, prev_node)
 		prev_node.next_nodes.append(new_node)
