@@ -1,38 +1,32 @@
 # run tests on the project
 
 from client import Wallet, SimpleMiner
-from node import BaseNode
+from node import ActiveNode
 
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-
-def send_block(b):
-	data = urlencode({"data": b.convert_to_str()}).encode()
-	with urlopen(Request("http://localhost:8000/block/new", data=data)) as res:
-		print(res.read().decode())
 
 w = Wallet()
 w.create_account("brady")
 
 m = SimpleMiner(w.get_addr("brady"))
 
-n = BaseNode(("localhost", 8000))
-n.start_server()
+n = ActiveNode("http://localhost:8000")
+n.sources.append("http://localhost:8000")
+n.sources.append("http://unbased.source")
+n.sources.append("asdfasdf")
+n.start()
 
 block = m.mine_block("0")
-n.send("http://localhost:8000/block/new", {"data": block.convert_to_str()})
+n.widely_broadcast_block(block.convert_to_str())
 
-m.queue_transaction(w.create_transaction("brady", "bradbahal", 10, 0))
+m.queue_transaction(w.create_transaction("brady", "<h1>BRAD MOMENT</h1>", 10, 0))
 block2 = m.mine_block(block.hash)
-send_block(block2)
+n.widely_broadcast_block(block2.convert_to_str())
 
-print("ready, go to http://localhost:8000/block/latest to see block2")
+print("go to http://localhost:8000/block/latest")
 
-try:
-	while True:
-		pass
-except:
-	n.stop_server()
+
 
 
 
