@@ -1,6 +1,7 @@
 # run tests on the project
 
-from client import Wallet, SimpleMiner, Node
+from client import Wallet, SimpleMiner
+from node import BaseNode
 
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -15,11 +16,11 @@ w.create_account("brady")
 
 m = SimpleMiner(w.get_addr("brady"))
 
-n = Node()
+n = BaseNode(("localhost", 8000))
 n.start_server()
 
 block = m.mine_block("0")
-send_block(block)
+n.send("http://localhost:8000/block/new", {"data": block.convert_to_str()})
 
 m.queue_transaction(w.create_transaction("brady", "bradbahal", 10, 0))
 block2 = m.mine_block(block.hash)
