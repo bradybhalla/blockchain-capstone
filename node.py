@@ -64,6 +64,7 @@ class PassiveNode(BlockchainManager):
 					wfile.write(self.blocks[self.ledger.current_node.hash].encode())
 			except KeyError:
 				wfile.write("NO BLOCKS RECORDED".encode())
+
 		elif path == ["block"]:
 			try:
 				with self.blockchain_lock:
@@ -122,16 +123,38 @@ class PassiveNode(BlockchainManager):
 
 	def on_new_block(self, block_str):
 		try:
-			with self.blockchain_lock:
-				block = Block.convert_from_str(block_str)
-				self.add_block(block)
-				self.blocks[block.hash] = block_str
+			block = Block.convert_from_str(block_str)
+			self.add_block(block, block_str = block_str)
 			return True
 		except AddBlockException as e:
 			pass
 		except:
 			pass
 		return False
+
+	def add_block(self, block, block_str=None, has_lock=False):
+		if not has_lock:
+			self.blockchain_lock.acquire()
+
+
+		try:
+			BlockchainManager.add_block(self, block)
+		except Exception as e:
+			if not has_lock:
+				self.blockchain_lock.release()
+			raise e
+
+
+		if block_str is None:
+			block_str = block.convert_to_str()
+
+
+		self.blocks[block.hash] = block_str
+
+
+		if not has_lock:
+			self.blockchain_lock.release()
+
 
 	def on_new_source(self, source):
 		with self.sources_lock:
@@ -178,7 +201,10 @@ class ActiveNode(PassiveNode):
 		if not has_lock:
 			self.sources_lock.acquire()
 		
-		res = choice(self.sources)
+		if len(self.sources) == 0:
+			res = None
+		else:
+			res = choice(self.sources)
 
 		if not has_lock:
 			self.sources_lock.release()
@@ -189,7 +215,10 @@ class ActiveNode(PassiveNode):
 		if not has_lock:
 			self.sources_lock.acquire()
 
-		res = sample(self.sources, N)
+		if len(self.sources) < N:
+			res = self.sources[:]
+		else:
+			res = sample(self.sources, N)
 
 		if not has_lock:
 			self.sources_lock.release()
@@ -205,6 +234,44 @@ class ActiveNode(PassiveNode):
 
 		if not has_lock:
 			self.sources_lock.release()
+
+
+	# TODO rewrite find block and add blok
+	def find_block(self, H, max_sources=10):
+		source = self.pick_source() # TODO: change
+
+		try:
+			block_str = self.request(source + "/block", {"H": H})
+
+			if block_str == "BLOCK NOT FOUND":
+				if max_sources > 1:
+					return self.find_block(H, max_sources-1)
+				return None
+
+			block = Block.convert_from_str(block_str)
+			return block
+		except Exception as e:
+			self.remove_source(source)
+			if max_sources > 1:
+				return self.find_block(H, max_sources-1)
+			return None
+
+	# todo: make it more thread safe, rewrite
+	def add_block(self, block, block_str=None):
+		if block.prev_block_hash in self.blocks or block.prev_block_hash=="0":
+			PassiveNode.add_block(self, block, block_str=block_str)
+			return
+
+		block_needed = block.prev_block_hash
+		found_block = self.find_block(block_needed)
+
+		if found_block is not None:
+			self.add_block(found_block)
+			PassiveNode.add_block(self, block, block_str=block_str)
+		else:
+			print("could not add block")
+			return
+
 
 	# waits [t] seconds, if self.running == False, it returns False and stops waiting
 	def _wait_running(self, t):
@@ -237,6 +304,12 @@ class ActiveNode(PassiveNode):
 			if not self._wait_running(interval):
 				break
 
+	def broadcast_self_addr(self, source):
+		try:
+			self.send(source + "/source/new", {"data":self.web_addr})
+		except Exception as e:
+			self.remove_source(source)
+
 	def broadcast_addr_background(self, interval=30):
 		while True:
 
@@ -246,10 +319,24 @@ class ActiveNode(PassiveNode):
 			if not self._wait_running(interval):
 				break
 
+	def on_new_block(self, block_str):
+		success = PassiveNode.on_new_block(self, block_str)
+
+		if not success:
+			return
+
+		"""
+		with self.blockchain_lock:
+			if self.blocks[self.get_prev_block_hash()] != block_str:
+				return
+		"""
+
+		self.widely_broadcast_block(block_str)
+
 	def broadcast_block(self, block_str, source):
 		try:
 			self.send(source + "/block/new", {"data":block_str})
-		except:
+		except Exception as e:
 			self.remove_source(source)
 
 	# broadcast block to up to N random sources

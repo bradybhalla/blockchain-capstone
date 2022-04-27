@@ -117,7 +117,21 @@ def pub_to_addr(key):
 	return hash_base64(key)[:24]
 
 def calc_miner_reward(height):
-	return 100
+	return int(50*0.99**(height//100))
 
+def calc_total_reward():
+	block = 1
+	total = 0
+	while True:
+		r = calc_miner_reward(block)
+		if r==0:
+			print("MAX BLOCK W/ REWARD:", block-1)
+			print("TOTAL BRADYCOIN:", total)
+			return
+		total += r
+		block += 1
+
+# pass in hash as an int
+# TODO: SECURITY LEVEL SHOULD BE 5
 def proof_of_work_verify(H, security=3):
 	return H[:security] == "B"*security

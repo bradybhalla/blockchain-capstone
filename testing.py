@@ -6,25 +6,106 @@ from node import ActiveNode
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from threading import Thread
+from time import sleep
+
+def print_chain(node):
+	current_blockchain_node = node.ledger.current_node
+	while True:
+		print(current_blockchain_node.hash)
+		if current_blockchain_node.hash == "0": break
+		current_blockchain_node = current_blockchain_node.prev_node
+
+class Running:
+	def __init__(self):
+		self.running = True
+
+def Exit():
+	running.running = False
+	ts = [Thread(target=i.stop) for i in [n1,n2,n3]]
+	for i in ts:
+		i.start()
+	for i in ts:
+		i.join()
+	exit()
+
+running = Running()
+
+def mine(node, miner_addr, running):
+	try:
+		m = SimpleMiner(miner_addr)
+		while running.running:
+			with node.blockchain_lock:
+				prev_hash = node.get_prev_block_hash()
+			
+			block = m.mine_block(prev_hash)
+			print(miner_addr, "just mined a block")
+			node.add_block(block)
+			node.widely_broadcast_block(block.convert_to_str())
+	except Exception as e:
+		print("THREAD ERROR:", str(e))
+
 w = Wallet()
 w.create_account("brady")
+w.create_account("finn")
+w.create_account("ryan")
 
-m = SimpleMiner(w.get_addr("brady"))
+m1 = SimpleMiner(w.get_addr("brady"))
+m2 = SimpleMiner(w.get_addr("finn"))
+m3 = SimpleMiner(w.get_addr("ryan"))
 
-n = ActiveNode("http://localhost:8000")
-n.sources.append("http://localhost:8000")
-n.sources.append("http://unbased.source")
-n.sources.append("asdfasdf")
-n.start()
+for i,j in w.accounts.items():
+	print(i, j[0])
 
-block = m.mine_block("0")
-n.widely_broadcast_block(block.convert_to_str())
 
-m.queue_transaction(w.create_transaction("brady", "<h1>BRAD MOMENT</h1>", 10, 0))
-block2 = m.mine_block(block.hash)
-n.widely_broadcast_block(block2.convert_to_str())
+n1 = ActiveNode("http://localhost:8000", port=8000)
+n2 = ActiveNode("http://localhost:8001", port=8001)
+n3 = ActiveNode("http://localhost:8002", port=8002)
 
-print("go to http://localhost:8000/block/latest")
+
+n1.start()
+n2.start()
+n3.start()
+
+n1.broadcast_self_addr(n2.web_addr)
+#n1.broadcast_self_addr(n3.web_addr)
+
+n2.broadcast_self_addr(n1.web_addr)
+n2.broadcast_self_addr(n3.web_addr)
+
+n3.broadcast_self_addr(n1.web_addr)
+n3.broadcast_self_addr(n2.web_addr)
+
+Thread(target=mine, args=(n1, w.get_addr("brady"), running)).start()
+Thread(target=mine, args=(n2, w.get_addr("finn"), running)).start()
+Thread(target=mine, args=(n3, w.get_addr("ryan"), running)).start()
+
+"""
+block = m1.mine_block("0")
+n1.add_block(block)
+n1.widely_broadcast_block(block.convert_to_str())
+
+block = m3.mine_block(block.hash)
+#n3.add_block(block)
+#n3.widely_broadcast_block(block.convert_to_str())
+"""
+
+
+while True:
+	sleep(5)
+	print("\n"*10)
+	print("n1", n1.ledger.money)
+	print("n2", n2.ledger.money)
+	print("n3", n3.ledger.money)
+
+
+#n.stop()
+
+#m.queue_transaction(w.create_transaction("brady", "<h1>BRAD MOMENT</h1>", 10, 0))
+#block2 = m.mine_block(block.hash)
+#n.widely_broadcast_block(block2.convert_to_str())
+
+#print("go to http://localhost:8000/block/latest")
 
 
 
