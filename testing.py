@@ -49,7 +49,7 @@ for i in nodes:
 sleep(2)
 
 print("starting mine")
-for i in range(2000):
+for i in range(100):
 	block = m1.mine_block(nodes[1].get_prev_block_hash())
 	nodes[1].add_block(block)
 print("ending mine")

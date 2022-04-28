@@ -132,17 +132,12 @@ class PassiveNode(BlockchainManager):
 		try:
 			block = Block.convert_from_str(block_str)
 			self.add_block(block, block_str = block_str, source=source)
-			return True
-		except AddBlockException as e:
-			pass
 		except:
 			pass
-		return False
 
 	def add_block(self, block, block_str=None, has_lock=False, *args, **kwargs):
 		if not has_lock:
 			self.blockchain_lock.acquire()
-
 
 		try:
 			BlockchainManager.add_block(self, block)
@@ -287,7 +282,10 @@ class ActiveNode(PassiveNode):
 
 		while len(stack) > 0:
 			block, block_str = stack.pop()
-			PassiveNode.add_block(self, block, block_str=block_str)
+
+			with self.blockchain_lock:
+				if block.hash not in self.blocks:
+					PassiveNode.add_block(self, block, block_str=block_str, has_lock=True)
 
 
 	# waits [t] seconds, if self.running == False, it returns False and stops waiting
@@ -370,15 +368,23 @@ class ActiveNode(PassiveNode):
 		return PassiveNode.on_new_source(self, source)
 
 	def on_new_block(self, block_str, source=None):
-		success = PassiveNode.on_new_block(self, block_str, source)
+		try:
+			block = Block.convert_from_str(block_str)
 
-		if not success:
+			with self.blockchain_lock:
+				if block.hash in self.blocks:
+					return
+
+			self.add_block(block, block_str = block_str, source=source)
+		except:
 			return
 
 		with self.blockchain_lock:
-			if self.get_prev_block_hash() in self.blocks:
-				if self.blocks[self.get_prev_block_hash()] != block_str:
-					return
+			if self.get_prev_block_hash() not in self.blocks:
+				print("this is bad")
+				return
+			if self.blocks[self.get_prev_block_hash()] != block_str:
+				return
 
 		self.widely_broadcast_block(block_str, orig_source=source)
 
