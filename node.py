@@ -5,9 +5,12 @@ from urllib.parse import urlparse, parse_qs, urlencode
 from urllib.request import Request, urlopen
 from threading import Thread, Lock
 
+from abc import ABCMeta, abstractmethod
 from pickle import dump, load
 from random import choice, sample
 from time import sleep
+
+# todo: remove print statements
 
 # base node that pretty much only receives
 class PassiveNode(BlockchainManager):
@@ -88,7 +91,11 @@ class PassiveNode(BlockchainManager):
 		# new block
 		if path == ["block", "new"]:
 			try:
-				Thread(target=self.on_new_block, args=(query["data"],)).start()
+				if "source" in query:
+					Thread(target=self.on_new_source, args=(query["source"],)).start()
+					Thread(target=self.on_new_block, args=(query["data"],), kwargs={"source":query["source"]}).start()
+				else:
+					Thread(target=self.on_new_block, args=(query["data"],)).start()
 
 				wfile.write("BLOCK RECIEVED".encode())
 
@@ -121,10 +128,10 @@ class PassiveNode(BlockchainManager):
 		with urlopen(Request(web_addr + "?" + urlencode(data))) as res:
 			return res.read().decode()
 
-	def on_new_block(self, block_str):
+	def on_new_block(self, block_str, source=None):
 		try:
 			block = Block.convert_from_str(block_str)
-			self.add_block(block, block_str = block_str)
+			self.add_block(block, block_str = block_str, source=source)
 			return True
 		except AddBlockException as e:
 			pass
@@ -132,7 +139,7 @@ class PassiveNode(BlockchainManager):
 			pass
 		return False
 
-	def add_block(self, block, block_str=None, has_lock=False):
+	def add_block(self, block, block_str=None, has_lock=False, *args, **kwargs):
 		if not has_lock:
 			self.blockchain_lock.acquire()
 
@@ -164,6 +171,8 @@ class PassiveNode(BlockchainManager):
 		try:
 			if self.request(source + "/ping") == "RUNNING":
 				with self.sources_lock:
+					if source in self.sources:
+						return False
 					self.sources.append(source)
 				return True
 		except:
@@ -226,6 +235,7 @@ class ActiveNode(PassiveNode):
 		return res
 
 	def remove_source(self, source, has_lock=False):
+		print("removing", source)
 		if not has_lock:
 			self.sources_lock.acquire()
 
@@ -237,39 +247,39 @@ class ActiveNode(PassiveNode):
 
 
 	# TODO rewrite find block and add blok
-	def find_block(self, H, max_sources=10):
-		source = self.pick_source() # TODO: change
+	def find_block(self, H, starting_source=None, max_sources=10):
+		source = starting_source if starting_source is not None else self.pick_source()
 
 		try:
 			block_str = self.request(source + "/block", {"H": H})
 
 			if block_str == "BLOCK NOT FOUND":
 				if max_sources > 1:
-					return self.find_block(H, max_sources-1)
+					return self.find_block(H, max_sources=max_sources-1)
 				return None
 
 			block = Block.convert_from_str(block_str)
 			return block
 		except Exception as e:
+			print(262, e)
 			self.remove_source(source)
 			if max_sources > 1:
-				return self.find_block(H, max_sources-1)
+				return self.find_block(H, max_sources=max_sources-1)
 			return None
 
-	# todo: make it more thread safe, rewrite
-	def add_block(self, block, block_str=None):
-		if block.prev_block_hash in self.blocks or block.prev_block_hash=="0":
-			PassiveNode.add_block(self, block, block_str=block_str)
-			return
+	def add_block(self, block, block_str=None, source=None, *args, **kwargs):
+		with self.blockchain_lock:
+			if block.prev_block_hash in self.blocks or block.prev_block_hash=="0":
+				PassiveNode.add_block(self, block, block_str=block_str, has_lock=True)
+				return
 
 		block_needed = block.prev_block_hash
-		found_block = self.find_block(block_needed)
+		found_block = self.find_block(block_needed, starting_source=source)
 
 		if found_block is not None:
-			self.add_block(found_block)
+			self.add_block(found_block, source=source)
 			PassiveNode.add_block(self, block, block_str=block_str)
 		else:
-			print("could not add block")
 			return
 
 
@@ -285,21 +295,45 @@ class ActiveNode(PassiveNode):
 
 		return self.running
 
-	def poll_sources_background(self, interval=30):
+
+	def _poll_source_list(self, source):
+		try:
+			source_list = self.request(source + "/source/list").split("\n")
+			for s in source_list:
+				if not self.running:
+					return
+				self.on_new_source(s)
+		except Exception as e:
+			print(301, str(e))
+			self.remove_source(source)
+
+	def poll_sources_background(self, interval=120, num_sources=10):
 		while True:
 
-			# todo, pick a random source, get sources, incorporate them
-			#print("polling for sources")
+			sources_to_check = self.pick_sources(num_sources)
+			for s in sources_to_check:
+				Thread(target=self._poll_source_list, args=(s,)).start()
 
-			# wait 30 seconds but stop if self.running == False
+			# wait [interval] seconds but stop if self.running == False
 			if not self._wait_running(interval):
 				break
 
-	def poll_blocks_background(self, interval=10):
+	def _poll_latest_block(self, source):
+		try:
+			block_str = self.request(source + "/block/latest")
+			if block_str == "NO BLOCKS RECORDED":
+				return
+			self.on_new_block(block_str, source=source)
+		except Exception as e:
+			print(321, str(e))
+			self.remove_source(source)
+
+	def poll_blocks_background(self, interval=120, num_sources=10):
 		while True:
 
-			# todo, pick a random source, get latest block, incorporate it
-			#print("polling for blocks")
+			sources_to_check = self.pick_sources(num_sources)
+			for s in sources_to_check:
+				Thread(target=self._poll_latest_block, args=(s,)).start()
 
 			if not self._wait_running(interval):
 				break
@@ -308,59 +342,89 @@ class ActiveNode(PassiveNode):
 		try:
 			self.send(source + "/source/new", {"data":self.web_addr})
 		except Exception as e:
+			print(339, str(e))
 			self.remove_source(source)
 
-	def broadcast_addr_background(self, interval=30):
+	def broadcast_addr_background(self, interval=120, num_sources=10):
 		while True:
 
-			# todo, pick a random source, get latest block, incorporate it
-			#print("broadcasting my address")
+			sources_to_check = self.pick_sources(num_sources)
+			for s in sources_to_check:
+				Thread(target=self.broadcast_self_addr, args=(s,)).start()
+
 
 			if not self._wait_running(interval):
 				break
 
-	def on_new_block(self, block_str):
-		success = PassiveNode.on_new_block(self, block_str)
+	def on_new_source(self, source):
+		if source == self.web_addr:
+			return False
+
+		return PassiveNode.on_new_source(self, source)
+
+	def on_new_block(self, block_str, source=None):
+		success = PassiveNode.on_new_block(self, block_str, source)
 
 		if not success:
 			return
 
-		"""
 		with self.blockchain_lock:
-			if self.blocks[self.get_prev_block_hash()] != block_str:
-				return
-		"""
+			if self.get_prev_block_hash() in self.blocks:
+				if self.blocks[self.get_prev_block_hash()] != block_str:
+					return
 
-		self.widely_broadcast_block(block_str)
+		self.widely_broadcast_block(block_str, orig_source=source)
 
-	def broadcast_block(self, block_str, source):
+	def broadcast_block(self, block_str, source, orig_source=None):
 		try:
-			self.send(source + "/block/new", {"data":block_str})
+			if orig_source is None:
+				self.send(source + "/block/new", {"data":block_str, "source":self.web_addr})
+			else:
+				self.send(source + "/block/new", {"data":block_str, "source":orig_source})
 		except Exception as e:
+			print(382, e)
 			self.remove_source(source)
 
 	# broadcast block to up to N random sources
-	def widely_broadcast_block(self, block_str, N=20):
+	def widely_broadcast_block(self, block_str, N=20, orig_source=None):
 		with self.sources_lock:
 			l = self.sources if len(self.sources) <= N else self.pick_sources(N, has_lock=True)
 
 		for source in l:
-			Thread(target=self.broadcast_block, args=(block_str, source)).start()
+			Thread(target=self.broadcast_block, args=(block_str, source), kwargs={"orig_source":orig_source}).start()
 
-"""
-class SavableNode(BaseNode):
+
+class SavableNode(metaclass=ABCMeta):
+	@abstractmethod
+	def get_save_info(self):
+		pass
+
+	@abstractmethod
+	def create_node(info):
+		pass
+
 	def save(self, filename):
+		info = self.get_save_info()
+
 		with open(filename, "wb") as f:
-			dump(self, f)
+			dump(info, f)
 
-	def load(filename):
+	def load(node_type, filename):
 		with open(filename, "rb") as f:
-			node = load(f)
+			info = load(f)
 
-		node.back_online()
+		return node_type.create_node(info)
+
+class SavableActiveNode(ActiveNode, SavableNode):
+	def get_save_info(self):
+		return [self.past_blocks, self.ledger, self.blocks, self.sources, self.port, self.web_addr]
+
+	def create_node(info):
+		past_blocks, ledger, blocks, sources, port, web_addr = info
+		node = SavableActiveNode(web_addr, port=port)
+
+		(node.past_blocks, node.ledger, node.blocks, node.sources) = (past_blocks, ledger, blocks, sources)
 
 		return node
 
-	def back_online(self):
-		pass
-"""
+	

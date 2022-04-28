@@ -1,13 +1,15 @@
 # run tests on the project
 
 from client import Wallet, SimpleMiner
-from node import ActiveNode
+from blockchain import Block
+from node import SavableActiveNode
 
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from threading import Thread
 from time import sleep
+from random import choice
 
 def print_chain(node):
 	current_blockchain_node = node.ledger.current_node
@@ -16,34 +18,13 @@ def print_chain(node):
 		if current_blockchain_node.hash == "0": break
 		current_blockchain_node = current_blockchain_node.prev_node
 
-class Running:
-	def __init__(self):
-		self.running = True
-
 def Exit():
-	running.running = False
-	ts = [Thread(target=i.stop) for i in [n1,n2,n3]]
+	ts = [Thread(target=i.stop) for i in nodes]
 	for i in ts:
 		i.start()
 	for i in ts:
 		i.join()
-	exit()
-
-running = Running()
-
-def mine(node, miner_addr, running):
-	try:
-		m = SimpleMiner(miner_addr)
-		while running.running:
-			with node.blockchain_lock:
-				prev_hash = node.get_prev_block_hash()
-			
-			block = m.mine_block(prev_hash)
-			print(miner_addr, "just mined a block")
-			node.add_block(block)
-			node.widely_broadcast_block(block.convert_to_str())
-	except Exception as e:
-		print("THREAD ERROR:", str(e))
+	#exit()
 
 w = Wallet()
 w.create_account("brady")
@@ -51,53 +32,56 @@ w.create_account("finn")
 w.create_account("ryan")
 
 m1 = SimpleMiner(w.get_addr("brady"))
-m2 = SimpleMiner(w.get_addr("finn"))
-m3 = SimpleMiner(w.get_addr("ryan"))
 
 for i,j in w.accounts.items():
 	print(i, j[0])
 
+nodes = [SavableActiveNode("http://localhost:{}".format(i), port=i) for i in range(8000,8003)]
 
-n1 = ActiveNode("http://localhost:8000", port=8000)
-n2 = ActiveNode("http://localhost:8001", port=8001)
-n3 = ActiveNode("http://localhost:8002", port=8002)
+for i in nodes:
+	i.start()
 
+for i in nodes:
+	for j in nodes:
+		if i != j:
+			i.broadcast_self_addr(j.web_addr)
 
-n1.start()
-n2.start()
-n3.start()
+sleep(2)
 
-n1.broadcast_self_addr(n2.web_addr)
-#n1.broadcast_self_addr(n3.web_addr)
+print("starting mine")
+for i in range(800):
+	block = m1.mine_block(nodes[1].get_prev_block_hash())
+	nodes[1].add_block(block)
+print("ending mine")
+nodes[1].widely_broadcast_block(block.convert_to_str())
 
-n2.broadcast_self_addr(n1.web_addr)
-n2.broadcast_self_addr(n3.web_addr)
+try:
+	while True:
+		print("\n"*10)
+		for i in nodes:
+			print(i.sources, i.ledger.money)
+		sleep(5)
+except KeyboardInterrupt:
+	pass
 
-n3.broadcast_self_addr(n1.web_addr)
-n3.broadcast_self_addr(n2.web_addr)
+for i in nodes:
+	print(len(i.sources), i.ledger.money)
 
-Thread(target=mine, args=(n1, w.get_addr("brady"), running)).start()
-Thread(target=mine, args=(n2, w.get_addr("finn"), running)).start()
-Thread(target=mine, args=(n3, w.get_addr("ryan"), running)).start()
+Exit()
 
-"""
-block = m1.mine_block("0")
-n1.add_block(block)
-n1.widely_broadcast_block(block.convert_to_str())
-
-block = m3.mine_block(block.hash)
+#block = m3.mine_block(block.hash)
 #n3.add_block(block)
 #n3.widely_broadcast_block(block.convert_to_str())
+
+
 """
-
-
 while True:
 	sleep(5)
 	print("\n"*10)
 	print("n1", n1.ledger.money)
 	print("n2", n2.ledger.money)
 	print("n3", n3.ledger.money)
-
+"""
 
 #n.stop()
 

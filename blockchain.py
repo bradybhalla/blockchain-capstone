@@ -112,7 +112,7 @@ class AddBlockException(Exception):
 class BlockchainManager:
 	def __init__(self):
 		self.starting_block = Block0()
-		self.past_blocks = set(self.starting_block.hash) # hashes of past blocks
+		self.past_blocks = set([self.starting_block.hash]) # hashes of past blocks
 		self.ledger = LedgerState(self.starting_block)
 
 	def _find_node(self, target_hash, current_path=None, visited=None):
