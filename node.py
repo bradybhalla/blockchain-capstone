@@ -256,31 +256,38 @@ class ActiveNode(PassiveNode):
 			if block_str == "BLOCK NOT FOUND":
 				if max_sources > 1:
 					return self.find_block(H, max_sources=max_sources-1)
-				return None
+				return None, None
 
 			block = Block.convert_from_str(block_str)
-			return block
+			return block, block_str
 		except Exception as e:
 			print(262, e)
 			self.remove_source(source)
 			if max_sources > 1:
 				return self.find_block(H, max_sources=max_sources-1)
-			return None
+			return None, None
 
 	def add_block(self, block, block_str=None, source=None, *args, **kwargs):
-		with self.blockchain_lock:
-			if block.prev_block_hash in self.blocks or block.prev_block_hash=="0":
-				PassiveNode.add_block(self, block, block_str=block_str, has_lock=True)
+		stack = [(block, block_str)]
+
+		while True:
+			block_needed = stack[-1][0].prev_block_hash
+
+			with self.blockchain_lock:
+				if block_needed in self.blocks or block_needed == "0":
+					break
+
+			found_block, found_block_str = self.find_block(block_needed, starting_source=source)
+
+			if found_block is None:
+				print("could not find a block, canceling operation")
 				return
 
-		block_needed = block.prev_block_hash
-		found_block = self.find_block(block_needed, starting_source=source)
+			stack.append((found_block, found_block_str))
 
-		if found_block is not None:
-			self.add_block(found_block, source=source)
+		while len(stack) > 0:
+			block, block_str = stack.pop()
 			PassiveNode.add_block(self, block, block_str=block_str)
-		else:
-			return
 
 
 	# waits [t] seconds, if self.running == False, it returns False and stops waiting
