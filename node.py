@@ -1,4 +1,4 @@
-from blockchain import Block, BlockchainManager, AddBlockException
+from blockchain import Block, BlockchainManager
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs, urlencode
@@ -219,7 +219,7 @@ class ActiveNode(PassiveNode):
 		if not has_lock:
 			self.sources_lock.acquire()
 
-		if len(self.sources) < N:
+		if len(self.sources) <= N:
 			res = self.sources[:]
 		else:
 			res = sample(self.sources, N)
@@ -400,8 +400,8 @@ class ActiveNode(PassiveNode):
 
 	# broadcast block to up to N random sources
 	def widely_broadcast_block(self, block_str, N=20, orig_source=None):
-		with self.sources_lock:
-			l = self.sources if len(self.sources) <= N else self.pick_sources(N, has_lock=True)
+		print("WIDELY BROADCASTING BLOCK")
+		l = self.pick_sources(N)
 
 		for source in l:
 			Thread(target=self.broadcast_block, args=(block_str, source), kwargs={"orig_source":orig_source}).start()
@@ -440,4 +440,13 @@ class SavableActiveNode(ActiveNode, SavableNode):
 
 		return node
 
+	def start(self):
+		ActiveNode.start(self)
+
+	def get_up_to_date(self, sources):
+		for s in sources:
+			Thread(target=self.on_new_source, args=(s,))
+			Thread(target=self._poll_source_list, args=(s,))
+			Thread(target=self._poll_latest_block, args=(s,))
+			Thread(target=self.broadcast_self_addr, args=(s,))
 	

@@ -36,7 +36,7 @@ m1 = SimpleMiner(w.get_addr("brady"))
 for i,j in w.accounts.items():
 	print(i, j[0])
 
-nodes = [SavableActiveNode("http://localhost:{}".format(i), port=i) for i in range(8000,8003)]
+nodes = [SavableActiveNode("http://localhost:{}".format(i), port=i) for i in range(8000,8005)]
 
 for i in nodes:
 	i.start()
@@ -46,28 +46,25 @@ for i in nodes:
 		if i != j:
 			i.broadcast_self_addr(j.web_addr)
 
-sleep(2)
+sleep(3)
 
 print("starting mine")
-for i in range(100):
-	block = m1.mine_block(nodes[1].get_prev_block_hash())
-	nodes[1].add_block(block)
-print("ending mine")
-nodes[1].widely_broadcast_block(block.convert_to_str())
+for i in range(500):
+	block = m1.mine_block(nodes[0].get_prev_block_hash())
+	block_str = block.convert_to_str()
+	nodes[0].add_block(block)
+	if i%10 == 0:
+		nodes[0].widely_broadcast_block(block_str)
 
-try:
-	while True:
-		print("\n"*10)
-		for i in nodes:
-			print(i.sources, i.ledger.money)
-		sleep(5)
-except KeyboardInterrupt:
-	pass
+print("ending mine")
+
+sleep(3)
 
 for i in nodes:
 	print(len(i.sources), i.ledger.money)
 
-Exit()
+
+#Exit()
 
 #block = m3.mine_block(block.hash)
 #n3.add_block(block)
