@@ -173,6 +173,17 @@ class PassiveNode(BlockchainManager):
 		except:
 			return False
 
+	def get_prev_block_hash(self, has_lock=False):
+		if not has_lock:
+			self.blockchain_lock.acquire()
+
+		res = BlockchainManager.get_prev_block_hash(self)
+
+		if not has_lock:
+			self.blockchain_lock.release()
+
+		return res
+
 # node that will ask for information it doesn't have
 class ActiveNode(PassiveNode):
 	def __init__(self, web_addr, *args, **kwargs):
@@ -380,10 +391,10 @@ class ActiveNode(PassiveNode):
 			return
 
 		with self.blockchain_lock:
-			if self.get_prev_block_hash() not in self.blocks:
+			if self.get_prev_block_hash(has_lock=True) not in self.blocks:
 				print("this is bad")
 				return
-			if self.blocks[self.get_prev_block_hash()] != block_str:
+			if self.blocks[self.get_prev_block_hash(has_lock=True)] != block_str:
 				return
 
 		self.widely_broadcast_block(block_str, orig_source=source)

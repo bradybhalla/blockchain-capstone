@@ -1,7 +1,15 @@
 from utils import *
 from node import SavableActiveNode
 
+from threading import Lock
+
 # look at multiprocessing
+
+# locking order is alphabetical:
+# 		blockchain_lock
+#		sources_lock
+#		transactions_lock
+# (try to not have multiple locks at once though)
 
 def Miner(SavableActiveNode):
 	def __init__(self, miner_addr, *args, **kwargs):
@@ -9,26 +17,51 @@ def Miner(SavableActiveNode):
 
 		self.miner_addr = miner_addr
 
-	def _block_data_hash(self, transactions, miner, prev_block_hash):
+
+		self.transactions = [] # binary search to insert
+		self.transaction_lock = Lock()
+
+	def _block_data_hash(self, prev_block_hash, transactions, miner):
 		transactions_hash = hash_base64(" ".join(t.hash for t in transactions))
-		return hash_base64(prev_block_hash + transactions_hash + miner)
+		return hash_base64(prev_block_hash + transactions_hash + self.miner_addr)
 
-	def get_transactions(self):
-		pass
+	def get_transactions(self, has_lock = False):
+		if not has_lock:
+			self.transaction_lock.acquire()
 
-	def mine(self, hashes=10000):
-		with self.blockchain_lock:
-			data_hash = self._block_data_hash(self.get_transactions(), self.miner_addr, self.get_prev_block_hash())
-			
-		nonce = str(randint(1,2**256))
-		while not proof_of_work_verify(hash_base64(data_hash + nonce)):
-			nonce = str(randint(1,2**256))
+		res = [] # TODO: get transactions
 
-		res = Block(self._queued_transactions, self.addr, prev_hash, nonce)
-
-		self._queued_transactions = []
+		if not has_lock:
+			self.transaction_lock.release()
 
 		return res
 
-	def mine_success(self, block):
+	def verify_transactions(self, transactions):
+		pass # TODO
+
+	def mine(self, hashes=10000, transactions=None, prev_hash=None, data_hash=None):
+		if transactions is None:
+			transactions = self.get_transactions()
+
+		if prev_hash is None:
+			prev_hash = self.get_prev_block_hash()
+
+		if data_hash is None:
+			data_hash = self._block_data_hash(prev_hash, transactions, self.miner_addr)
+			
+		found = False
+		for _ in range(hashes):
+			nonce = str(randint(1,2**256))
+
+			if proof_of_work_verify(hash_base64(data_hash + nonce)):
+				found = True
+				break
+
+		if found:
+			res = Block(transactions, self.miner_addr, prev_hash, nonce)
+			return res
+		else:
+			return None
+
+	def on_mine_success(self, block):
 		pass
