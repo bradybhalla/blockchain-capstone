@@ -28,33 +28,19 @@ def Exit():
 
 w = Wallet()
 w.create_account("brady")
-w.create_account("finn")
 
-m1 = MinerNode(w.get_addr("brady"), "http://localhost:8000", port=8000)
-m2 = MinerNode(w.get_addr("finn"), "http://localhost:8001", port=8001)
-
-nodes = [m1,m2]
-for i in nodes:
-	i.ledger.money[m1.miner_addr] = 10000
-
+m1 = MinerNode(w.get_addr("brady"), "http://164.104.91.187", port=80)
 m1.start()
-m2.start()
 
 
-m1.broadcast_self_addr(m2.web_addr)
-m2.broadcast_self_addr(m1.web_addr)
-sleep(1)
 
-print(1)
-m1.mine_iteration()
-print(2)
-sleep(1)
-m2.mine_iteration()
+#m1.broadcast_self_addr(m2.web_addr)
 
-w.known_miners.append("http://localhost:8000")
-w.known_miners.append("http://localhost:8001")
-for i in range(5):
-	w.transact("brady", "orange", 45, randint(1,5))
+#m2.mine_iteration()
+
+w.known_miners.append(m1.web_addr)
+
+
 
 """
 sleep(3)
