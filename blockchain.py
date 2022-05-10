@@ -163,14 +163,6 @@ class BlockchainManager:
 			current_path.append(LedgerStateAction(next_node, False))
 			current_node = next_node
 
-
-	def _verify_block_transactions(self, block):
-		# assumes ledger state is set up correctly
-		for t in block.transactions:
-			if not self.ledger.is_valid(t):
-				return False
-		return True
-
 	def add_block(self, block):
 		# TODO add max block length??
 
@@ -186,8 +178,8 @@ class BlockchainManager:
 		prev_node, actions = self._find_node(block.prev_block_hash)
 		self.ledger.update(actions)
 
-		if not self._verify_block_transactions(block):
-			raise AddBlockException("Invalid transactions in block")
+		if not self.ledger.is_valid_multiple(block.transactions):
+			raise AddBlockException("Invalid or repeat transactions in block")
 		
 		new_node = BlockchainNode(block, prev_node)
 		prev_node.next_nodes.append(new_node)

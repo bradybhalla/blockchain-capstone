@@ -1,15 +1,14 @@
 # run tests on the project
 
-from client import Wallet, SimpleMiner
-from blockchain import Block
-from node import SavableActiveNode
+from client import Wallet
+from miner import MinerNode
 
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from threading import Thread
 from time import sleep
-from random import choice
+from random import choice, randint
 
 def print_chain(node):
 	current_blockchain_node = node.ledger.current_node
@@ -24,8 +23,83 @@ def Exit():
 		i.start()
 	for i in ts:
 		i.join()
-	#exit()
+	exit()
 
+
+w = Wallet()
+w.create_account("brady")
+w.create_account("finn")
+
+m1 = MinerNode(w.get_addr("brady"), "http://localhost:8000", port=8000)
+m2 = MinerNode(w.get_addr("finn"), "http://localhost:8001", port=8001)
+
+nodes = [m1,m2]
+for i in nodes:
+	i.ledger.money[m1.miner_addr] = 10000
+
+m1.start()
+m2.start()
+
+
+m1.broadcast_self_addr(m2.web_addr)
+m2.broadcast_self_addr(m1.web_addr)
+sleep(1)
+
+print(1)
+m1.mine_iteration()
+print(2)
+sleep(1)
+m2.mine_iteration()
+
+w.known_miners.append("http://localhost:8000")
+w.known_miners.append("http://localhost:8001")
+for i in range(5):
+	w.transact("brady", "orange", 45, randint(1,5))
+
+"""
+sleep(3)
+
+print(m1.available_transactions.lookup)
+
+m2.mine_iteration()
+sleep(1)
+
+print("ready")
+
+print(m1.ledger.money)
+print(m2.ledger.money)
+
+print(m1.available_transactions.lookup)
+"""
+
+
+"""
+bm = BlockchainManager()
+
+w = Wallet()
+w.create_account("brady")
+w.create_account("finn")
+
+m = SimpleMiner(w.get_addr("brady"))
+
+bm.add_block(m.mine_block(bm.get_prev_block_hash()))
+bm.add_block(m.mine_block(bm.get_prev_block_hash()))
+bm.add_block(m.mine_block(bm.get_prev_block_hash()))
+
+t = w.create_transaction("brady", w.get_addr("finn"), 50, 3)
+t2 = w.create_transaction("brady", w.get_addr("finn"), 50, 3)
+m.queue_transaction(t)
+m.queue_transaction(t2)
+bm.add_block(m.mine_block(bm.get_prev_block_hash()))
+
+#m.queue_transaction(t2)
+bm.add_block(m.mine_block(bm.get_prev_block_hash()))
+
+print(bm.ledger.money)
+
+
+"""
+"""
 w = Wallet()
 w.create_account("brady")
 w.create_account("finn")
@@ -62,7 +136,7 @@ sleep(3)
 
 for i in nodes:
 	print(len(i.sources), i.ledger.money)
-
+"""
 
 #Exit()
 

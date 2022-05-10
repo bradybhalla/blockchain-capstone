@@ -133,5 +133,5 @@ def calc_total_reward():
 
 # pass in hash as an int
 # TODO: SECURITY LEVEL SHOULD BE 5
-def proof_of_work_verify(H, security=2):
+def proof_of_work_verify(H, security=5):
 	return H[:security] == "B"*security

@@ -135,7 +135,7 @@ class PassiveNode(BlockchainManager):
 		except:
 			pass
 
-	def add_block(self, block, block_str=None, has_lock=False, *args, **kwargs):
+	def add_block(self, block, block_str=None, has_lock=False, **kwargs):
 		if not has_lock:
 			self.blockchain_lock.acquire()
 
@@ -252,7 +252,6 @@ class ActiveNode(PassiveNode):
 			self.sources_lock.release()
 
 
-	# TODO rewrite find block and add blok
 	def find_block(self, H, starting_source=None, max_sources=10):
 		source = starting_source if starting_source is not None else self.pick_source()
 
@@ -273,7 +272,7 @@ class ActiveNode(PassiveNode):
 				return self.find_block(H, max_sources=max_sources-1)
 			return None, None
 
-	def add_block(self, block, block_str=None, source=None, *args, **kwargs):
+	def add_block(self, block, block_str=None, source=None, **kwargs):
 		stack = [(block, block_str)]
 
 		while True:

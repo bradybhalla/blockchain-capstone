@@ -6,10 +6,15 @@ from signature import CompressedECDSA
 from transaction import Transaction
 from blockchain import Block
 
+from threading import Thread
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
 class Wallet:
 	def __init__(self):
 		self.sig_algorithm = CompressedECDSA()
 		self.accounts = {}
+		self.known_miners = []
 
 	def create_account(self, name):
 		pub, priv = self.sig_algorithm.keygen()
@@ -25,6 +30,15 @@ class Wallet:
 
 	def get_addr(self, name):
 		return self.accounts[name][0]
+
+	def send_transaction(self, web_addr, t):
+		with urlopen(Request(web_addr + "/transaction/new", data=urlencode({"data":t}).encode())) as res:
+			return res.read().decode()
+
+	def transact(self, account_name, to_addr, amount, miner_fee):
+		t = self.create_transaction(account_name, to_addr, amount, miner_fee).convert_to_str()
+		for i in self.known_miners:
+			Thread(target=self.send_transaction, args=(i, t)).start()
 
 # doesn't do any verification
 class SimpleMiner:

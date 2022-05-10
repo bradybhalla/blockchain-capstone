@@ -1,7 +1,34 @@
 from utils import *
+from transaction import Transaction
+from blockchain import Block
 from node import SavableActiveNode
 
-from threading import Lock
+from threading import Thread, Lock
+from time import time
+from heapq import heapify, heappop
+
+# not very efficient but works
+# need to rethink if you suddenly have thousands of transactions
+class TransactionPriorityStructure:
+
+	def __init__(self):
+		self.lookup = {}
+
+	def add(self, t):
+		if t.hash not in self.lookup:
+			self.lookup[t.hash] = (t, time())
+
+	def remove(self, t_hash):
+		if t_hash in self.lookup:
+			del self.lookup[t_hash]
+
+	def gen_decreasing(self):
+		ts = [(-self.lookup[i][0].miner_fee, self.lookup[i][1], i) for i in self.lookup.keys()]
+		heapify(ts)
+
+		while len(ts) > 0:
+			yield self.lookup[heappop(ts)[2]][0]
+
 
 # look at multiprocessing
 
@@ -11,37 +38,92 @@ from threading import Lock
 #		transactions_lock
 # (try to not have multiple locks at once though)
 
-def Miner(SavableActiveNode):
+class MinerNode(SavableActiveNode):
 	def __init__(self, miner_addr, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 
 		self.miner_addr = miner_addr
 
 
-		self.transactions = [] # binary search to insert
+		self.available_transactions = TransactionPriorityStructure()
 		self.transaction_lock = Lock()
+
+	def add_block(self, block, **kwargs):
+		SavableActiveNode.add_block(self, block, **kwargs)
+
+		if self.get_prev_block_hash() == block.hash:
+			with self.transaction_lock:
+				for t in block.transactions:
+					self.available_transactions.remove(t.hash)
+
+	def handle_post(self, path, query, wfile):
+		if path == ["transaction", "new"]:
+			try:
+				Thread(target=self.on_new_transaction, args=(query["data"],)).start()
+				wfile.write("BLOCK RECIEVED".encode())
+			except:
+				wfile.write("INVALID REQUEST".encode())
+		else:
+			SavableActiveNode.handle_post(self, path, query, wfile)
 
 	def _block_data_hash(self, prev_block_hash, transactions, miner):
 		transactions_hash = hash_base64(" ".join(t.hash for t in transactions))
 		return hash_base64(prev_block_hash + transactions_hash + self.miner_addr)
 
-	def get_transactions(self, has_lock = False):
-		if not has_lock:
-			self.transaction_lock.acquire()
+	def on_new_transaction(self, transaction_str):
+		try:
+			transaction = Transaction.convert_from_str(transaction_str)
 
-		res = [] # TODO: get transactions
+			with self.blockchain_lock:
+				valid = self.ledger.is_valid(transaction)
 
-		if not has_lock:
-			self.transaction_lock.release()
+			if valid:
+				with self.transaction_lock:
+					self.available_transactions.add(transaction)
+
+		except:
+			return
+
+	def get_verified_transactions(self, num = 20):
+		res = []
+
+		with self.blockchain_lock:
+			with self.transaction_lock:
+				# close to the is_valid_multiple method of transaction.Ledger
+				spending = {}
+				transaction_hashes = set()
+
+				g = self.available_transactions.gen_decreasing()
+
+				for t in g:
+
+					if not self.ledger.is_valid(t):
+						self.available_transactions.remove(t.hash)
+						continue
+
+					if t.from_addr not in spending:
+						spending[t.from_addr] = 0
+
+					if spending[t.from_addr] + t.amount + t.miner_fee > self.ledger.money[t.from_addr]:
+						self.available_transactions.remove(t.hash)
+						continue
+
+					if t.hash in transaction_hashes:
+						self.available_transactions.remove(t.hash)
+						continue
+
+					spending[t.from_addr] += t.amount + t.miner_fee
+					transaction_hashes.add(t.hash)
+
+					res.append(t)
+					if len(res) >= num:
+						break
 
 		return res
 
-	def verify_transactions(self, transactions):
-		pass # TODO
-
-	def mine(self, hashes=10000, transactions=None, prev_hash=None, data_hash=None):
+	def mine_attempt(self, hashes=10**7, transactions=None, prev_hash=None, data_hash=None):
 		if transactions is None:
-			transactions = self.get_transactions()
+			transactions = self.get_verified_transactions()
 
 		if prev_hash is None:
 			prev_hash = self.get_prev_block_hash()
@@ -63,5 +145,23 @@ def Miner(SavableActiveNode):
 		else:
 			return None
 
-	def on_mine_success(self, block):
-		pass
+	def mine_iteration(self):
+		b = self.mine_attempt()
+		if b is not None:
+			self.on_new_block(b.convert_to_str())
+
+
+
+	# TODO
+	"""
+		def get_save_info(self):
+		return [self.past_blocks, self.ledger, self.blocks, self.sources, self.port, self.web_addr]
+
+	def create_node(info):
+		past_blocks, ledger, blocks, sources, port, web_addr = info
+		node = SavableActiveNode(web_addr, port=port)
+
+		(node.past_blocks, node.ledger, node.blocks, node.sources) = (past_blocks, ledger, blocks, sources)
+
+		return node
+	"""
