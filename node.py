@@ -469,13 +469,13 @@ class SavableNode(metaclass=ABCMeta):
 
 class SavableActiveNode(ActiveNode, SavableNode):
 	def get_save_info(self):
-		return [self.past_blocks, self.ledger, self.blocks, self.sources, self.port, self.web_addr]
+		return [self.past_blocks, self.ledger, self.blocks, self.sources, self.known_miners, self.port, self.web_addr]
 
 	def create_node(info):
-		past_blocks, ledger, blocks, sources, port, web_addr = info
+		past_blocks, ledger, blocks, sources, known_miners, port, web_addr = info
 		node = SavableActiveNode(web_addr, port=port)
 
-		(node.past_blocks, node.ledger, node.blocks, node.sources) = (past_blocks, ledger, blocks, sources)
+		(node.past_blocks, node.ledger, node.blocks, node.sources, node.known_miners) = (past_blocks, ledger, blocks, sources, known_miners)
 
 		return node
 

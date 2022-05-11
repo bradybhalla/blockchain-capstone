@@ -156,12 +156,12 @@ class MinerNode(SavableActiveNode):
 			self.on_new_block(b.convert_to_str())
 
 	def get_save_info(self):
-		return [self.past_blocks, self.ledger, self.blocks, self.sources, self.port, self.web_addr, self.miner_addr, self.available_transactions]
+		return [self.past_blocks, self.ledger, self.blocks, self.sources, self.known_miners, self.port, self.web_addr, self.miner_addr, self.available_transactions]
 
 	def create_node(info):
-		past_blocks, ledger, blocks, sources, port, web_addr, miner_addr, available_transactions = info
+		past_blocks, ledger, blocks, sources, known_miners, port, web_addr, miner_addr, available_transactions = info
 		node = MinerNode(miner_addr, web_addr, port=port)
 
-		(node.past_blocks, node.ledger, node.blocks, node.sources, node.available_transactions) = (past_blocks, ledger, blocks, sources, available_transactions)
+		(node.past_blocks, node.ledger, node.blocks, node.sources, node.known_miners, node.available_transactions) = (past_blocks, ledger, blocks, sources, known_miners, available_transactions)
 
 		return node
