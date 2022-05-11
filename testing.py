@@ -1,5 +1,31 @@
 # run tests on the project
 
+"""
+REQUESTING - GET
+
+/money
+
+/block/latest
+/block?H=<hash>
+
+/source/list
+/source/miner/list
+
+/ping
+/ping/miner
+
+
+SENDING - POST
+
+/block/new    data=<block> [source=<source>]
+/source/new
+
+# for miners
+/transaction/new    data=<transaction>
+
+"""
+
+
 from client import Wallet
 from miner import MinerNode
 
@@ -18,27 +44,16 @@ def print_chain(node):
 		current_blockchain_node = current_blockchain_node.prev_node
 
 def Exit():
-	ts = [Thread(target=i.stop) for i in nodes]
-	for i in ts:
-		i.start()
-	for i in ts:
-		i.join()
+	m1.stop()
 	exit()
 
 
 w = Wallet()
 w.create_account("brady")
+w.create_account("finn")
 
-m1 = MinerNode(w.get_addr("brady"), "http://164.104.91.187", port=80)
+m1 = MinerNode(w.get_addr("brady"), "http://164.104.90.180:8000", port=8000)
 m1.start()
-
-
-
-#m1.broadcast_self_addr(m2.web_addr)
-
-#m2.mine_iteration()
-
-w.known_miners.append(m1.web_addr)
 
 
 

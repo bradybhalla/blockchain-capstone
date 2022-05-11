@@ -43,7 +43,7 @@ class MinerNode(SavableActiveNode):
 		super().__init__(*args, **kwargs)
 
 		self.miner_addr = miner_addr
-
+		self.known_miners.append(self.web_addr)
 
 		self.available_transactions = TransactionPriorityStructure()
 		self.transaction_lock = Lock()
@@ -55,6 +55,13 @@ class MinerNode(SavableActiveNode):
 			with self.transaction_lock:
 				for t in block.transactions:
 					self.available_transactions.remove(t.hash)
+
+
+	def handle_get(self, path, query, wfile):
+		if path == ["ping", "miner"]:
+			wfile.write("TRUE".encode())
+		else:
+			SavableActiveNode.handle_get(self, path, query, wfile)
 
 	def handle_post(self, path, query, wfile):
 		if path == ["transaction", "new"]:
@@ -93,9 +100,7 @@ class MinerNode(SavableActiveNode):
 				spending = {}
 				transaction_hashes = set()
 
-				g = self.available_transactions.gen_decreasing()
-
-				for t in g:
+				for t in self.available_transactions.gen_decreasing():
 
 					if not self.ledger.is_valid(t):
 						self.available_transactions.remove(t.hash)
@@ -150,18 +155,13 @@ class MinerNode(SavableActiveNode):
 		if b is not None:
 			self.on_new_block(b.convert_to_str())
 
-
-
-	# TODO
-	"""
-		def get_save_info(self):
-		return [self.past_blocks, self.ledger, self.blocks, self.sources, self.port, self.web_addr]
+	def get_save_info(self):
+		return [self.past_blocks, self.ledger, self.blocks, self.sources, self.port, self.web_addr, self.miner_addr, self.available_transactions]
 
 	def create_node(info):
-		past_blocks, ledger, blocks, sources, port, web_addr = info
-		node = SavableActiveNode(web_addr, port=port)
+		past_blocks, ledger, blocks, sources, port, web_addr, miner_addr, available_transactions = info
+		node = MinerNode(miner_addr, web_addr, port=port)
 
-		(node.past_blocks, node.ledger, node.blocks, node.sources) = (past_blocks, ledger, blocks, sources)
+		(node.past_blocks, node.ledger, node.blocks, node.sources, node.available_transactions) = (past_blocks, ledger, blocks, sources, available_transactions)
 
 		return node
-	"""

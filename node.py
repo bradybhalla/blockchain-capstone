@@ -19,12 +19,13 @@ class PassiveNode(BlockchainManager):
 
 		self.blocks = {}
 		self.sources = []
+		self.known_miners = []
 
 		self.blockchain_lock = Lock()
 		self.sources_lock = Lock()
 
 		self.port = port
-		self.webserver = HTTPServer(("localhost", self.port), self._create_handler_class())
+		self.webserver = HTTPServer(("0.0.0.0", self.port), self._create_handler_class())
 		self.server_thread = Thread(target=self.webserver.serve_forever)
 
 	def _create_handler_class(node_obj):
@@ -60,8 +61,16 @@ class PassiveNode(BlockchainManager):
 		return NodeRequestHandler
 
 	def handle_get(self, path, query, wfile):
+		# display money
+		if path == ["money"]:
+			try:
+				with self.blockchain_lock:
+					wfile.write(str(self.ledger.money).encode())
+			except:
+				wfile.write("UH OH".encode())
+
 		# block requests
-		if path == ["block", "latest"]:
+		elif path == ["block", "latest"]:
 			try:
 				with self.blockchain_lock:
 					wfile.write(self.blocks[self.ledger.current_node.hash].encode())
@@ -79,10 +88,15 @@ class PassiveNode(BlockchainManager):
 		elif path == ["source", "list"]:
 			with self.sources_lock:
 				wfile.write("\n".join(self.sources).encode())
+		elif path == ["source", "miner", "list"]:
+			with self.sources_lock:
+				wfile.write("\n".join(self.known_miners).encode())
 
 		# ping request
 		elif path == ["ping"]:
 			wfile.write("RUNNING".encode())
+		elif path == ["ping", "miner"]:
+			wfile.write("FALSE".encode())
 
 		else:
 			wfile.write("INVALID REQUEST".encode())
@@ -157,6 +171,14 @@ class PassiveNode(BlockchainManager):
 		if not has_lock:
 			self.blockchain_lock.release()
 
+	def ping_miner(self, source):
+		try:
+			if self.request(source + "/ping/miner") == "TRUE":
+				with self.sources_lock:
+					if source not in self.known_miners:
+						self.known_miners.append(source)
+		except:
+			pass
 
 	def on_new_source(self, source):
 		with self.sources_lock:
@@ -169,6 +191,7 @@ class PassiveNode(BlockchainManager):
 					if source in self.sources:
 						return False
 					self.sources.append(source)
+				Thread(target=self.ping_miner, args=(source,)).start()
 				return True
 		except:
 			return False
@@ -247,6 +270,8 @@ class ActiveNode(PassiveNode):
 
 		if source in self.sources:
 			self.sources.remove(source)
+		if source in self.known_miners:
+			self.known_miners.remove(source)
 
 		if not has_lock:
 			self.sources_lock.release()
@@ -450,13 +475,10 @@ class SavableActiveNode(ActiveNode, SavableNode):
 
 		return node
 
-	def start(self):
-		ActiveNode.start(self)
-
 	def get_up_to_date(self, sources):
 		for s in sources:
-			Thread(target=self.on_new_source, args=(s,))
-			Thread(target=self._poll_source_list, args=(s,))
-			Thread(target=self._poll_latest_block, args=(s,))
-			Thread(target=self.broadcast_self_addr, args=(s,))
+			Thread(target=self.on_new_source, args=(s,)).start()
+			Thread(target=self._poll_source_list, args=(s,)).start()
+			Thread(target=self._poll_latest_block, args=(s,)).start()
+			Thread(target=self.broadcast_self_addr, args=(s,)).start()
 	
