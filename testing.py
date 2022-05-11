@@ -50,7 +50,6 @@ def Exit():
 
 w = Wallet()
 w.create_account("brady")
-w.create_account("finn")
 
 m1 = MinerNode(w.get_addr("brady"), "http://164.104.90.180:8000", port=8000)
 m1.start()

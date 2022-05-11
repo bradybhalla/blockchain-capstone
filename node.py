@@ -1,6 +1,7 @@
 from blockchain import Block, BlockchainManager
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qs, urlencode
 from urllib.request import Request, urlopen
 from threading import Thread, Lock
@@ -11,6 +12,9 @@ from random import choice, sample
 from time import sleep
 
 # todo: remove print statements
+
+class ThreadingServer(ThreadingMixIn, HTTPServer):
+	pass
 
 # base node that pretty much only receives
 class PassiveNode(BlockchainManager):
@@ -25,7 +29,7 @@ class PassiveNode(BlockchainManager):
 		self.sources_lock = Lock()
 
 		self.port = port
-		self.webserver = HTTPServer(("0.0.0.0", self.port), self._create_handler_class())
+		self.webserver = ThreadingServer(("0.0.0.0", self.port), self._create_handler_class())
 		self.server_thread = Thread(target=self.webserver.serve_forever)
 
 	def _create_handler_class(node_obj):
