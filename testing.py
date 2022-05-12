@@ -43,16 +43,14 @@ def print_chain(node):
 		if current_blockchain_node.hash == "0": break
 		current_blockchain_node = current_blockchain_node.prev_node
 
-def Exit():
-	m1.stop()
-	exit()
 
+if __name__=="__main__":
+	w = Wallet()
+	w.create_account("brady")
 
-w = Wallet()
-w.create_account("brady")
+	m1 = MinerNode(w.get_addr("brady"), "http://164.104.88.244:8000", port=8000)
+	m1.start()
 
-m1 = MinerNode(w.get_addr("brady"), "http://164.104.90.180:8000", port=8000)
-m1.start()
 
 
 

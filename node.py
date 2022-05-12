@@ -392,6 +392,9 @@ class ActiveNode(PassiveNode):
 	def broadcast_addr_background(self, interval=120, num_sources=10):
 		while True:
 
+
+
+
 			sources_to_check = self.pick_sources(num_sources)
 			for s in sources_to_check:
 				Thread(target=self.broadcast_self_addr, args=(s,)).start()

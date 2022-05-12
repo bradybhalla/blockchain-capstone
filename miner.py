@@ -7,6 +7,12 @@ from threading import Thread, Lock
 from time import time
 from heapq import heapify, heappop
 
+from multiprocessing import Process, Value, Array, Queue
+from ctypes import c_wchar_p
+
+MAX_TRANSACTIONS_IN_BLOCK = 20
+NUM_MINING_PROCESSES = 1
+
 # not very efficient but works
 # need to rethink if you suddenly have thousands of transactions
 class TransactionPriorityStructure:
@@ -47,6 +53,40 @@ class MinerNode(SavableActiveNode):
 
 		self.available_transactions = TransactionPriorityStructure()
 		self.transaction_lock = Lock()
+
+		self.background_threads.append(Thread(target=self.mining_update_background))
+		self.background_threads.append(Thread(target=self.new_block_handler_background))
+
+		self.data_hash = Array("c", 44)
+		self.block_data = ([], "", "")
+
+		self.new_block_queue = Queue()
+		self.mining = Value("b", False)
+
+		self.mining_processes = [
+			Process(
+				target=MinerNode.mining_process,
+				args=(self.data_hash, self.mining, self.new_block_queue, self.miner_addr)
+			) for i in range(NUM_MINING_PROCESSES)
+		]
+
+	def start(self):
+		SavableActiveNode.start(self)
+
+		with self.mining.get_lock():
+			self.mining.value = True
+
+		for i in self.mining_processes:
+			i.start()
+
+	def stop(self):
+		with self.mining.get_lock():
+			self.mining.value = False
+
+		SavableActiveNode.stop(self)
+
+		for i in self.mining_processes:
+			i.join()
 
 	def add_block(self, block, **kwargs):
 		SavableActiveNode.add_block(self, block, **kwargs)
@@ -91,7 +131,7 @@ class MinerNode(SavableActiveNode):
 		except:
 			return
 
-	def get_verified_transactions(self, num = 20):
+	def get_verified_transactions(self, num):
 		res = []
 
 		with self.blockchain_lock:
@@ -126,34 +166,73 @@ class MinerNode(SavableActiveNode):
 
 		return res
 
-	def mine_attempt(self, hashes=10**7, transactions=None, prev_hash=None, data_hash=None):
-		if transactions is None:
-			transactions = self.get_verified_transactions()
+	def _calculate_mining_data(self, num_transactions=MAX_TRANSACTIONS_IN_BLOCK):
+		transactions = self.get_verified_transactions(num_transactions)
+		prev_hash = self.get_prev_block_hash()
 
-		if prev_hash is None:
-			prev_hash = self.get_prev_block_hash()
+		with self.data_hash.get_lock():
+			self.data_hash.value = self._block_data_hash(prev_hash, transactions, self.miner_addr).encode()
 
-		if data_hash is None:
-			data_hash = self._block_data_hash(prev_hash, transactions, self.miner_addr)
-			
-		found = False
-		for _ in range(hashes):
-			nonce = str(randint(1,2**256))
+		self.block_data = (transactions, self.miner_addr, prev_hash)
 
-			if proof_of_work_verify(hash_base64(data_hash + nonce)):
-				found = True
+	def mining_update_background(self, interval=60, num_transactions=MAX_TRANSACTIONS_IN_BLOCK):
+		while True:
+
+			self._calculate_mining_data(num_transactions)
+
+			if not self._wait_running(interval):
 				break
 
-		if found:
-			res = Block(transactions, self.miner_addr, prev_hash, nonce)
-			return res
-		else:
-			return None
+	def _on_passed_block(self, block_str):
+		print("new block passed", block_str)
+		print("current previous block", self.get_prev_block_hash())
+		self.on_new_block(block_str)
+		print("new_prev block", self.get_prev_block_hash())
+		print()
+		print()
+		print()
+		self._calculate_mining_data()
 
-	def mine_iteration(self):
-		b = self.mine_attempt()
-		if b is not None:
-			self.on_new_block(b.convert_to_str())
+	def new_block_handler_background(self, interval=1):
+		while True:
+			try:
+				data_hash, nonce = self.new_block_queue.get_nowait()
+
+				transactions, miner, prev_block_hash = self.block_data
+
+				if self._block_data_hash(prev_block_hash, transactions, miner) != data_hash:
+					print("NOT EQUAL")
+					print()
+					print()
+					print()
+					continue
+
+				block = Block(transactions, miner, prev_block_hash, nonce).convert_to_str()
+
+				Thread(target=self._on_passed_block, args=(block,)).start()
+			except:
+				pass
+
+			if not self._wait_running(interval):
+				break
+
+	def mining_process(self_data_hash, self_mining, self_new_block_queue, self_miner_addr, hashes_at_a_time=10**5, hashes_before_exit_check=10**5):
+
+		n = 0
+		data_hash = ""
+
+		while True:
+			if n%hashes_at_a_time == 0:
+				data_hash = self_data_hash.value.decode()
+			if n%hashes_before_exit_check == 0:
+				if not self_mining.value:
+					break
+
+			nonce = str(randint(1,2**256))
+			if proof_of_work_verify(hash_base64(data_hash + nonce)):
+				self_new_block_queue.put((data_hash, nonce))
+
+			n += 1
 
 	def get_save_info(self):
 		return [self.past_blocks, self.ledger, self.blocks, self.sources, self.known_miners, self.port, self.web_addr, self.miner_addr, self.available_transactions]
