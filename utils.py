@@ -117,7 +117,7 @@ def pub_to_addr(key):
 	return hash_base64(key)[:24]
 
 def calc_miner_reward(height):
-	return int(50*0.99**(height//100))
+	return int(50*0.99**(height//1000))
 
 def calc_total_reward():
 	block = 1
