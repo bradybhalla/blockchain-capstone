@@ -29,28 +29,31 @@ SENDING - POST
 from client import Wallet
 from miner import MinerNode
 
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+# if you have an address, you don't need a password
+MINER_ADDR = None
+MINER_PASSWORD = "AMONGUS3"
 
-from threading import Thread
-from time import sleep
-from random import choice, randint
+# server information
+SERVER_ADDR = "http://164.104.88.244:8000"
+PORT = 8000
 
-def print_chain(node):
-	current_blockchain_node = node.ledger.current_node
-	while True:
-		print(current_blockchain_node.hash)
-		if current_blockchain_node.hash == "0": break
-		current_blockchain_node = current_blockchain_node.prev_node
+# number of mining subprocesses
+NUM_MINING_PROCESSES = 3
+
+# pre-existing nodes for getting connected to the network
+KNOWN_NODES = ["http://164.104.88.245:8000"]
 
 
 if __name__=="__main__":
-	w = Wallet()
-	w.create_account("brady")
 
-	m1 = MinerNode(w.get_addr("brady"), "http://164.104.88.244:8000", port=8000)
+	if MINER_ADDR is None:
+		w = Wallet()
+		w.create_account("miner", password=MINER_PASSWORD)
+		MINER_ADDR = w.get_addr("miner")
+
+	m1 = MinerNode(MINER_ADDR, NUM_MINING_PROCESSES, SERVER_ADDR, port=PORT)
 	m1.start()
-
+	m1.get_up_to_date(KNOWN_NODES)
 
 
 

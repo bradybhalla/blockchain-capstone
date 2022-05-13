@@ -11,7 +11,6 @@ from multiprocessing import Process, Value, Array, Queue
 from ctypes import c_wchar_p
 
 MAX_TRANSACTIONS_IN_BLOCK = 20
-NUM_MINING_PROCESSES = 1
 
 # not very efficient but works
 # need to rethink if you suddenly have thousands of transactions
@@ -45,7 +44,7 @@ class TransactionPriorityStructure:
 # (try to not have multiple locks at once though)
 
 class MinerNode(SavableActiveNode):
-	def __init__(self, miner_addr, *args, **kwargs):
+	def __init__(self, miner_addr, num_processes, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 
 		self.miner_addr = miner_addr
@@ -67,7 +66,7 @@ class MinerNode(SavableActiveNode):
 			Process(
 				target=MinerNode.mining_process,
 				args=(self.data_hash, self.mining, self.new_block_queue, self.miner_addr)
-			) for i in range(NUM_MINING_PROCESSES)
+			) for i in range(num_processes)
 		]
 
 	def start(self):
@@ -201,10 +200,6 @@ class MinerNode(SavableActiveNode):
 				transactions, miner, prev_block_hash = self.block_data
 
 				if self._block_data_hash(prev_block_hash, transactions, miner) != data_hash:
-					print("NOT EQUAL")
-					print()
-					print()
-					print()
 					continue
 
 				block = Block(transactions, miner, prev_block_hash, nonce).convert_to_str()

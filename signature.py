@@ -84,8 +84,9 @@ class ECDSA(DigitalSignature):
 		# (prime) order of generator point
 		self.n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 
-	def keygen(self):
-		priv = randint(0,self.n-1)
+	def keygen(self, priv=None):
+		if priv is None:
+			priv = randint(0,self.n-1)
 		pub = self.curve.mult(self.G, priv)
 		return (pub, priv)
 
@@ -115,8 +116,8 @@ class CompressedECDSA(ECDSA):
 		S1 = sig>>256
 		return (S1, S2)
 
-	def keygen(self):
-		pub, priv = super().keygen()
+	def keygen(self, priv=None):
+		pub, priv = super().keygen(priv=priv)
 		pub = int_to_base64(self.curve.compress(pub), 256//8 + 1)
 		priv = int_to_base64(priv, 256//8)
 		return (pub, priv)

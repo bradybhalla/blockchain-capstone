@@ -16,8 +16,12 @@ class Wallet:
 		self.accounts = {}
 		self.known_miners = []
 
-	def create_account(self, name):
-		pub, priv = self.sig_algorithm.keygen()
+	def create_account(self, name, password=None):
+		if password is None:
+			priv = None
+		else:
+			priv = pow(2, hash_int(password), self.sig_algorithm.n)
+		pub, priv = self.sig_algorithm.keygen(priv=priv)
 		addr = pub_to_addr(pub)
 		self.accounts[name] = (addr, pub, priv)
 

@@ -268,7 +268,7 @@ class ActiveNode(PassiveNode):
 		return res
 
 	def remove_source(self, source, has_lock=False):
-		print("removing", source)
+		#print("removing", source)
 		if not has_lock:
 			self.sources_lock.acquire()
 
@@ -295,7 +295,7 @@ class ActiveNode(PassiveNode):
 			block = Block.convert_from_str(block_str)
 			return block, block_str
 		except Exception as e:
-			print(262, e)
+			#print(262, e)
 			self.remove_source(source)
 			if max_sources > 1:
 				return self.find_block(H, max_sources=max_sources-1)
@@ -314,7 +314,7 @@ class ActiveNode(PassiveNode):
 			found_block, found_block_str = self.find_block(block_needed, starting_source=source)
 
 			if found_block is None:
-				print("could not find a block, canceling operation")
+				#print("could not find a block, canceling operation")
 				return
 
 			stack.append((found_block, found_block_str))
@@ -348,7 +348,7 @@ class ActiveNode(PassiveNode):
 					return
 				self.on_new_source(s)
 		except Exception as e:
-			print(301, str(e))
+			#print(301, str(e))
 			self.remove_source(source)
 
 	def poll_sources_background(self, interval=120, num_sources=10):
@@ -369,7 +369,7 @@ class ActiveNode(PassiveNode):
 				return
 			self.on_new_block(block_str, source=source)
 		except Exception as e:
-			print(321, str(e))
+			#print(321, str(e))
 			self.remove_source(source)
 
 	def poll_blocks_background(self, interval=120, num_sources=10):
@@ -386,7 +386,7 @@ class ActiveNode(PassiveNode):
 		try:
 			self.send(source + "/source/new", {"data":self.web_addr})
 		except Exception as e:
-			print(339, str(e))
+			#print(339, str(e))
 			self.remove_source(source)
 
 	def broadcast_addr_background(self, interval=120, num_sources=10):
@@ -423,7 +423,7 @@ class ActiveNode(PassiveNode):
 
 		with self.blockchain_lock:
 			if self.get_prev_block_hash(has_lock=True) not in self.blocks:
-				print("this is bad")
+				#print("this is bad")
 				return
 			if self.blocks[self.get_prev_block_hash(has_lock=True)] != block_str:
 				return
@@ -437,12 +437,12 @@ class ActiveNode(PassiveNode):
 			else:
 				self.send(source + "/block/new", {"data":block_str, "source":orig_source})
 		except Exception as e:
-			print(382, e)
+			#print(382, e)
 			self.remove_source(source)
 
 	# broadcast block to up to N random sources
 	def widely_broadcast_block(self, block_str, N=20, orig_source=None):
-		print("WIDELY BROADCASTING BLOCK")
+		#print("WIDELY BROADCASTING BLOCK")
 		l = self.pick_sources(N)
 
 		for source in l:
