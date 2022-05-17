@@ -31,17 +31,17 @@ from miner import MinerNode
 
 # if you have an address, you don't need a password
 MINER_ADDR = None
-MINER_PASSWORD = "AMONGUS3"
+MINER_PASSWORD = "AMONGUS20"
 
 # server information
-SERVER_ADDR = "http://164.104.88.244:8000"
+SERVER_ADDR = "http://164.104.xxx.xxx:8000"
 PORT = 8000
 
 # number of mining subprocesses
-NUM_MINING_PROCESSES = 3
+NUM_MINING_PROCESSES = 1
 
 # pre-existing nodes for getting connected to the network
-KNOWN_NODES = ["http://164.104.88.245:8000"]
+KNOWN_NODES = ["http://164.104.92.34:8000"]
 
 
 if __name__=="__main__":
