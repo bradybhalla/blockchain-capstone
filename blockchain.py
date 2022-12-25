@@ -93,6 +93,8 @@ class LedgerStateAction:
 				ledger.money[addr] -= self.node.net_ledger[addr]
 			ledger.current_node = self.node.prev_node
 
+# tracks the current state of the ledger
+# blocks can be added or undone to the state
 class LedgerState(Ledger):
 	def __init__(self, current_node):
 		super().__init__()
@@ -109,6 +111,9 @@ class LedgerState(Ledger):
 class AddBlockException(Exception):
 	pass
 
+
+# manages the blockchain
+# finds the longest chain in the tree of blocks
 class BlockchainManager:
 	def __init__(self):
 		self.starting_block = Block0()

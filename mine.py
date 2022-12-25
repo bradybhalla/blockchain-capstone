@@ -1,6 +1,9 @@
-# run tests on the project
+# create a miner, connect to nodes, and start mining
 
 """
+-- This is the interface for nodes ---
+
+
 REQUESTING - GET
 
 /money
@@ -30,32 +33,40 @@ from client import Wallet
 from miner import MinerNode
 
 # if you have an address, you don't need a password
+# otherwise the public address will be generated from the private password
 MINER_ADDR = None
-MINER_PASSWORD = "password"
+MINER_PASSWORD = "brady432"
 
 # server information
-SERVER_ADDR = "http://192.168.xxx.xxx:8000"
+# SERVER_ADDR should be your ip address
+SERVER_ADDR = "http://192.168.5.36:8000"
 PORT = 8000
 
 # number of mining subprocesses
-NUM_MINING_PROCESSES = 1
+NUM_MINING_PROCESSES = 10
 
 # pre-existing nodes for getting connected to the network
-KNOWN_NODES = ["http://192.168.5.36:8000"]
+# at least one known node is needed to connect to an existing blockchain
+KNOWN_NODES = ["http://192.168.4.42:8000"]
 
 
 if __name__=="__main__":
 
+	# generate address if needed
 	if MINER_ADDR is None:
 		w = Wallet()
 		w.create_account("miner", password=MINER_PASSWORD)
 		MINER_ADDR = w.get_addr("miner")
 
+	# create the miner and start mining
 	m1 = MinerNode(MINER_ADDR, NUM_MINING_PROCESSES, SERVER_ADDR, port=PORT)
 	m1.start()
 	m1.get_up_to_date(KNOWN_NODES)
 
 
+#############################
+#### IGNORE BELOW THIS ######
+#############################
 
 """
 sleep(3)

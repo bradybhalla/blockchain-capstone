@@ -35,14 +35,14 @@ class TransactionPriorityStructure:
 			yield self.lookup[heappop(ts)[2]][0]
 
 
-# look at multiprocessing
-
 # locking order is alphabetical:
 # 		blockchain_lock
 #		sources_lock
 #		transactions_lock
 # (try to not have multiple locks at once though)
 
+# a node that also mines new blocks and recieves transactions
+# to mine into the blockchain
 class MinerNode(SavableActiveNode):
 	def __init__(self, miner_addr, num_processes, *args, **kwargs):
 		super().__init__(*args, **kwargs)

@@ -4,6 +4,7 @@ from utils import *
 from elliptic import EllipticCurveFF
 from abc import ABCMeta, abstractmethod
 
+# every signature algorithm should have at least these methods
 class DigitalSignature(metaclass=ABCMeta):
 	# generate params if needed
 	def __init__(self):
@@ -22,6 +23,7 @@ class DigitalSignature(metaclass=ABCMeta):
 	def verify(self, H, sig, pub):
 		pass
 
+# RSA digital signatures
 class RSA(DigitalSignature):
 	def __init__(self):
 		self.prime_bits = 1024
@@ -44,6 +46,7 @@ class RSA(DigitalSignature):
 		H_1 = pow(sig, pub[0], pub[1])
 		return H == H_1
 
+# digital signature algorithm
 class DSA(DigitalSignature):
 	def __init__(self):
 		L,N = 1024,160
@@ -72,6 +75,7 @@ class DSA(DigitalSignature):
 		V2 = S1*S2_inv%self.q
 		return pow(self.g, V1, self.p)*pow(pub, V2, self.p)%self.p%self.q == S1
 
+# Elliptic curve digital signature algorithm
 # uses secp256k1 curve (bitcoin curve)
 class ECDSA(DigitalSignature):
 	def __init__(self):

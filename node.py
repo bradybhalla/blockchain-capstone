@@ -13,10 +13,11 @@ from time import sleep
 
 # todo: remove print statements
 
+# a threaded HTTP server so the nodes handle multiple requests better
 class ThreadingServer(ThreadingMixIn, HTTPServer):
 	pass
 
-# base node that pretty much only receives
+# base node that pretty much only receives new information
 class PassiveNode(BlockchainManager):
 	def __init__(self, port=8000):
 		super().__init__()
@@ -448,7 +449,8 @@ class ActiveNode(PassiveNode):
 		for source in l:
 			Thread(target=self.broadcast_block, args=(block_str, source), kwargs={"orig_source":orig_source}).start()
 
-
+# template class for creating savable nodes
+# these nodes pickle their current data and save it for later use
 class SavableNode(metaclass=ABCMeta):
 	@abstractmethod
 	def get_save_info(self):
@@ -470,6 +472,7 @@ class SavableNode(metaclass=ABCMeta):
 
 		return node_type.create_node(info)
 
+# an active node that can also be saved
 class SavableActiveNode(ActiveNode, SavableNode):
 	def get_save_info(self):
 		return [self.past_blocks, self.ledger, self.blocks, self.sources, self.known_miners, self.port, self.web_addr]
